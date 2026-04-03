@@ -1,89 +1,63 @@
-# LoginPTN — Smart Digital Learning Platform
+LoginPTN — Smart Digital Learning Platform
+LoginPTN adalah platform persiapan UTBK SNBT berbasis web yang mengintegrasikan AI untuk personalisasi belajar. Project ini dibangun untuk membantu pejuang PTN mengakses materi premium dan simulasi ujian dengan standar IRT.
 
-![LoginPTN Hero](public/hero.png)
+🚀 Fitur Utama
+AI Study Companion: Chatbot asisten untuk pembahasan soal dan rekomendasi strategi belajar.
 
-LoginPTN adalah platform pembelajaran digital tingkat lanjut bertenaga AI yang dirancang khusus untuk pejuang UTBK SNBT. Diciptakan dengan visi untuk mendemokratisasi akses ke bimbingan belajar berkualitas premium, LoginPTN menggabungkan metode pembelajaran berbasis riset (seperti Pomodoro dan Active Recall) dengan personalisasi yang didukung AI.
+Bank Soal & Tryout: Simulasi ujian dengan sistem blocking time dan penilaian mirip IRT.
 
-Platform ini hadir bukan hanya sebagai bank soal biasa, melainkan seperti mentor pribadi yang membimbing kamu langkah demi langkah menuju PTN Impian.
+Smart Analytics: Dashboard performa untuk melihat progres tiap subtes dan prediksi peluang lolos.
 
-## ✨ Fitur Unggulan
+Study Drive: Fitur untuk kelola materi PDF, ringkasan otomatis, dan flashcards bertenaga AI.
 
-- **🧠 LoginPTN AI Assistant**: Asisten AI cerdas yang siap menjawab, menjelaskan, dan merekomendasikan strategi belajar berdasarkan kekuatan dan kelemahanmu.
-- **📚 Smart Question Bank**: Ribuan soal latihan UTBK SNBT (TPS & Literasi) terstruktur dengan pembahasan komprehensif.
-- **⏱️ Realistic Tryout Simulator**: Tryout SNBT dengan blocking waktu, tingkat kesulitan dinamis, dan sistem scoring IRT-like.
-- **📊 Advanced Analytics**: Pelacakan performa, akurasi per subtes, prediksi passing grade, dan analisis trend mingguan.
-- **🫂 Study Groups (Community)**: Bergabunglah dengan sesama pejuang PTN favoritmu, berdiskusi, dan dapatkan peer-motivation.
-- **📄 PDF Workspace & Study Drive**: Upload materi belajarmu, buat ringkasan otomatis, generate flashcards, atau chat interaktif menggunakan AI langsung dari PDF.
-- **🎯 Score Rationalizer**: Kalkulator peluang diterima di PTN impian berdasarkan skor UTBK historis & data passing grade terbaru.
+Community Hub: Grup diskusi antar sesama pejuang PTN.
 
-## 🛠️ Stack Teknologi
+🛠️ Tech Stack
+Core: Next.js (App Router), React, TypeScript.
 
-LoginPTN dibangun menggunakan tech stack modern dan scalable:
+Styling: Tailwind CSS (Custom Design System).
 
-- **Frontend**: Next.js 16 (App Router), React 19, TypeScript
-- **Styling**: Tailwind CSS v4, Lucide Icons, UI Custom Design System (Glassmorphism + Dark Mode)
-- **Backend/Database**: Supabase (PostgreSQL), Supabase Auth
-- **AI Integration**: DigitalOcean GenAI Agent
-- **Data Visualization**: Recharts
+Backend: Supabase (Database, Auth, & Storage).
 
-## 🚀 Panduan Memulai (Development)
+AI: DigitalOcean GenAI Agent Integration.
 
-Untuk menjalankan proyek ini secara lokal, ikuti langkah-langkah berikut:
+Charts: Recharts.
 
-### 1. Prasyarat
-- Node.js versi terbaru (v18+)
-- npm atau pnpm
-- Akun Supabase
-
-### 2. Instalasi Dependensi
-\`\`\`bash
+🏁 Memulai Development
+1. Clone & Install
+Bash
+git clone <repository-url>
+cd LoginPTN
 npm install
-\`\`\`
+2. Environment Variables
+Buat file .env.local di root folder dan lengkapi datanya:
 
-### 3. Konfigurasi Environment Variables
-Gandakan \`.env.example\` menjadi \`.env.local\` dan isi kredensial berikut:
-\`\`\`env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+Cuplikan kode
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
 
-NEXT_PUBLIC_AI_AGENT_URL=https://agent-loginptnx-xy2z.ondigitalocean.app/api/v1/chat/completions
-AI_AGENT_API_KEY=your_digitalocean_ai_agent_key
-\`\`\`
+NEXT_PUBLIC_AI_AGENT_URL=your_ai_endpoint_url
+AI_AGENT_API_KEY=your_api_key
+3. Database Setup
+Gunakan file migrasi di supabase/migrations/ untuk setup tabel, RLS (Row Level Security), dan data awal universitas/subtes di instance Supabase kamu.
 
-### 4. Setup Database
-Jalankan file SQL schema yang terdapat di:
-\`\`\`
-supabase/migrations/001_complete_schema.sql
-\`\`\`
-File migrasi ini akan otomatis mengatur schema tabel, RLS policies, trigger auth, dan menyuntikkan (seeding) data awal universitas dan subtes.
-
-### 5. Jalankan Development Server
-\`\`\`bash
+4. Running
+Bash
 npm run dev
-\`\`\`
-Aplikasi dapat diakses melalui [http://localhost:3000](http://localhost:3000)
+Buka http://localhost:3000 untuk melihat hasilnya.
 
-## 🏗️ Struktur Proyek
+📁 Struktur Folder Utama
+src/app: Routing dan Page logic (Next.js App Router).
 
-- `/src/app` - Routing aplikasi Next.js (App Router pattern)
-  - `(auth)` - Grup rute untuk Login dan Register multi-step
-  - `(protected)` - Halaman Dashboard, Bank Soal, Tryout, dll yang dilindungi proxy auth
-- `/src/components` - Komponen React reusable (coming soon: refactor dari page)
-- `/src/lib` - Utilitas aplikasi
-  - `ai/agent.ts` - Penghubung ke DigitalOcean AI Agent
-  - `supabase/client.ts & server.ts` - Klien Supabase
-  - `constants.ts` - Data statis seperti Universitas, Subtes, Metode Belajar
-  - `types.ts` - Definisi TypeScript interfaces
-- `/src/providers` - Konteks global seperti AuthProvider & ThemeProvider
-- `/supabase` - Konfigurasi dan migrasi SQL Supabase
+src/components: UI components (Shared & Features).
 
-## 📖 Pedoman Kontribusi (Architecture Notes)
+src/lib: Logic untuk API client (Supabase & AI Agent), utils, dan types.
 
-LoginPTN dirancang untuk skalabilitas:
-- **Proxy/Middleware**: Perutean aman ditangani di tingkat proxy (Next.js config + Supabase auth).
-- **Desain Premium**: Hindari modifikasi default Tailwind utilities secara sembarangan, gunakan custom variables di `globals.css` untuk mempertahankan look and feel cyberpunk/modern.
-- **Client/Server Boundaries**: Jaga agar page complex dapat dirender dari server semaksimal mungkin, dan gunakan `"use client"` hanya pada interaksi dinamis.
+src/providers: Global context (Auth, Theme, dll).
 
-***
+supabase/: SQL migrations dan konfigurasi database.
 
-*Dibuat dengan ❤️ oleh AntiGravity (@Gemini) & Pembangun LoginPTN.*
+📝 Catatan Kontribusi
+Styling: Gunakan variabel custom di globals.css untuk menjaga konsistensi desain.
+
+Performance: Utamakan Server Components untuk fetching data berat, gunakan Client Components hanya untuk interaksi user.
