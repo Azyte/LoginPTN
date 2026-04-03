@@ -1,15 +1,61 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { GraduationCap, Search, Calculator, TrendingUp, AlertTriangle, CheckCircle2, ChevronDown, Award, School, MapPin } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+
+const UNIVERSITIES = [
+  { id: 1, name: "Universitas Indonesia", short_name: "UI", location: "Depok, Jawa Barat" },
+  { id: 2, name: "Universitas Gadjah Mada", short_name: "UGM", location: "Yogyakarta" },
+  { id: 3, name: "Institut Teknologi Bandung", short_name: "ITB", location: "Bandung, Jawa Barat" },
+  { id: 4, name: "Universitas Airlangga", short_name: "UNAIR", location: "Surabaya, Jawa Timur" },
+  { id: 5, name: "Institut Teknologi Sepuluh Nopember", short_name: "ITS", location: "Surabaya, Jawa Timur" },
+  { id: 6, name: "Universitas Diponegoro", short_name: "UNDIP", location: "Semarang, Jawa Tengah" },
+  { id: 7, name: "Universitas Padjadjaran", short_name: "UNPAD", location: "Bandung, Jawa Barat" },
+  { id: 8, name: "Universitas Brawijaya", short_name: "UB", location: "Malang, Jawa Timur" },
+  { id: 9, name: "Institut Pertanian Bogor", short_name: "IPB", location: "Bogor, Jawa Barat" },
+  { id: 10, name: "Universitas Hasanuddin", short_name: "UNHAS", location: "Makassar, Sulawesi Selatan" },
+  { id: 11, name: "Universitas Sebelas Maret", short_name: "UNS", location: "Surakarta, Jawa Tengah" },
+  { id: 12, name: "Universitas Sumatera Utara", short_name: "USU", location: "Medan, Sumatera Utara" },
+  { id: 13, name: "Universitas Andalas", short_name: "UNAND", location: "Padang, Sumatera Barat" },
+  { id: 14, name: "Universitas Negeri Yogyakarta", short_name: "UNY", location: "Yogyakarta" },
+  { id: 15, name: "Universitas Negeri Malang", short_name: "UM", location: "Malang, Jawa Timur" },
+  { id: 16, name: "Universitas Pendidikan Indonesia", short_name: "UPI", location: "Bandung, Jawa Barat" },
+  { id: 17, name: "Universitas Negeri Semarang", short_name: "UNNES", location: "Semarang, Jawa Tengah" },
+  { id: 18, name: "Universitas Negeri Surabaya", short_name: "UNESA", location: "Surabaya, Jawa Timur" },
+  { id: 19, name: "Universitas Jember", short_name: "UNEJ", location: "Jember, Jawa Timur" },
+  { id: 20, name: "Universitas Lampung", short_name: "UNILA", location: "Bandar Lampung" },
+  { id: 21, name: "Universitas Sriwijaya", short_name: "UNSRI", location: "Palembang, Sumatera Selatan" },
+  { id: 22, name: "Universitas Riau", short_name: "UNRI", location: "Pekanbaru, Riau" },
+  { id: 23, name: "Universitas Udayana", short_name: "UNUD", location: "Bali" },
+  { id: 24, name: "Universitas Negeri Jakarta", short_name: "UNJ", location: "Jakarta" },
+  { id: 25, name: "Universitas Syiah Kuala", short_name: "USK", location: "Banda Aceh" },
+].map(u => ({
+  ...u,
+  majors: generateMajors(u.id)
+}));
+
+function generateMajors(uniId: number) {
+  const base = [
+    { name: "Kedokteran", faculty: "FK", score: 720 },
+    { name: "Teknik Informatika", faculty: "FT", score: 660 },
+    { name: "Hukum", faculty: "FH", score: 640 },
+    { name: "Manajemen", faculty: "FEB", score: 630 },
+    { name: "Psikologi", faculty: "FPsi", score: 650 },
+    { name: "Farmasi", faculty: "FF", score: 620 },
+  ];
+  // Top 5 universities get higher passing scores
+  const tier = uniId <= 3 ? 40 : uniId <= 9 ? 20 : 0;
+  return base.map((m, i) => ({
+    id: uniId * 100 + i + 1,
+    name: m.name,
+    faculty: m.faculty,
+    passing_score_estimate: m.score + tier
+  }));
+}
 
 export default function ScoreCheckPage() {
-  const supabase = useMemo(() => createClient(), []);
-  
   const [score, setScore] = useState<string>("");
   const [searchUni, setSearchUni] = useState("");
-  const [universities, setUniversities] = useState<any[]>([]);
   const [selectedUni, setSelectedUni] = useState<any | null>(null);
   
   const [searchMajor, setSearchMajor] = useState("");
@@ -17,20 +63,12 @@ export default function ScoreCheckPage() {
   
   const [result, setResult] = useState<{ probability: string; level: "high" | "medium" | "low"; advice: string; gap: number; estimate: number } | null>(null);
 
-  useEffect(() => {
-    async function loadData() {
-      const { data } = await supabase.from("universities").select("*, majors(*)").order("name");
-      if (data) setUniversities(data);
-    }
-    loadData();
-  }, [supabase]);
-
   // Filters
   const filteredUniversities = useMemo(() => {
-    if (!searchUni.trim()) return universities;
+    if (!searchUni.trim()) return UNIVERSITIES;
     const lower = searchUni.toLowerCase();
-    return universities.filter(u => u.name.toLowerCase().includes(lower) || u.short_name.toLowerCase().includes(lower));
-  }, [searchUni, universities]);
+    return UNIVERSITIES.filter(u => u.name.toLowerCase().includes(lower) || u.short_name.toLowerCase().includes(lower));
+  }, [searchUni]);
 
   const availableMajors = selectedUni?.majors || [];
   const filteredMajors = useMemo(() => {

@@ -102,7 +102,7 @@ const ALL_MAJORS_FLAT = Object.entries(MAJORS_MAP).flatMap(([uniId, majors]) =>
 );
 
 export default function ProfilePage() {
-  const { profile, user } = useAuth();
+  const { profile, user, refreshProfile } = useAuth();
   const supabase = useMemo(() => createClient(), []);
 
   const [stats, setStats] = useState({ answered: 0, tryouts: 0, streak: 0 });
@@ -193,7 +193,9 @@ export default function ProfilePage() {
         return;
       }
 
-      window.location.reload();
+      await refreshProfile();
+      setIsEditOpen(false);
+      setSaving(false);
     } catch (err: any) {
       setSaveError(err.message || "Gagal menyimpan profil.");
       setSaving(false);

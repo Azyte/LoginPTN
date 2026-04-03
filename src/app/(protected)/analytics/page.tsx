@@ -15,59 +15,61 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     async function fetchAnalytics() {
-      if (!user) return;
+      if (!user) { setLoading(false); return; }
 
-      const [
-        { data: answersData },
-        { data: attemptsData },
-        { data: subjectsData }
-      ] = await Promise.all([
-        supabase.from("user_answers").select("is_correct, questions(subject_id)").eq("user_id", user.id),
-        supabase.from("tryout_attempts").select("finished_at, total_score").eq("user_id", user.id).eq("status", "completed").order("finished_at", { ascending: true }),
-        supabase.from("subjects").select("*").order("id")
-      ]);
+      try {
+        const [
+          { data: answersData },
+          { data: attemptsData },
+          { data: subjectsData }
+        ] = await Promise.all([
+          supabase.from("user_answers").select("is_correct, questions(subject_id)").eq("user_id", user.id),
+          supabase.from("tryout_attempts").select("finished_at, total_score").eq("user_id", user.id).eq("status", "completed").order("finished_at", { ascending: true }),
+          supabase.from("subjects").select("*").order("id")
+        ]);
 
-      // Calculate performance by subject
-      const subjStats: Record<number, { correct: number, total: number }> = {};
-      if (answersData) {
-        answersData.forEach((ans: any) => {
-          const sId = ans.questions?.subject_id;
-          if (sId) {
-            if (!subjStats[sId]) subjStats[sId] = { correct: 0, total: 0 };
-            subjStats[sId].total += 1;
-            if (ans.is_correct) subjStats[sId].correct += 1;
-          }
+        // Calculate performance by subject
+        const subjStats: Record<number, { correct: number, total: number }> = {};
+        if (answersData) {
+          answersData.forEach((ans: any) => {
+            const sId = ans.questions?.subject_id;
+            if (sId) {
+              if (!subjStats[sId]) subjStats[sId] = { correct: 0, total: 0 };
+              subjStats[sId].total += 1;
+              if (ans.is_correct) subjStats[sId].correct += 1;
+            }
+          });
+        }
+
+        const mappedPerformance = (subjectsData || []).map(sub => {
+          const stats = subjStats[sub.id] || { correct: 0, total: 0 };
+          const acc = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+          return {
+            subject: sub.code,
+            name: sub.name,
+            accuracy: acc,
+            total: stats.total,
+            correct: stats.correct
+          };
         });
+
+        setPerformanceData(mappedPerformance);
+
+        const mappedTrend = (attemptsData || []).map((att, i) => ({
+          label: `T${i + 1}`,
+          score: att.total_score || 0
+        }));
+
+        if (mappedTrend.length === 0) {
+          for (let i = 1; i <= 3; i++) mappedTrend.push({ label: `T${i}`, score: 0 });
+        }
+
+        setWeeklyTrend(mappedTrend);
+      } catch (err) {
+        console.error("Error loading analytics:", err);
+      } finally {
+        setLoading(false);
       }
-
-      const mappedPerformance = (subjectsData || []).map(sub => {
-        const stats = subjStats[sub.id] || { correct: 0, total: 0 };
-        const acc = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
-        return {
-          subject: sub.code,
-          name: sub.name,
-          accuracy: acc,
-          total: stats.total,
-          correct: stats.correct
-        };
-      });
-
-      setPerformanceData(mappedPerformance);
-
-      // Map Tryout trend
-      // Since a user might not have weekly structure strictly, we'll just map their historical completed tryouts
-      const mappedTrend = (attemptsData || []).map((att, i) => ({
-        label: `T${i + 1}`,
-        score: att.total_score || 0
-      }));
-
-      // Add zero placeholders if empty
-      if (mappedTrend.length === 0) {
-        for (let i = 1; i <= 3; i++) mappedTrend.push({ label: `T${i}`, score: 0 });
-      }
-
-      setWeeklyTrend(mappedTrend);
-      setLoading(false);
     }
     
     fetchAnalytics();

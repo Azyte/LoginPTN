@@ -32,12 +32,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = createClient();
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    setProfile(data);
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+      setProfile(data);
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+      setProfile(null);
+    }
   };
 
   const refreshProfile = async () => {
@@ -48,14 +53,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-      if (user) {
-        await fetchProfile(user.id);
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        setUser(user);
+        if (user) {
+          await fetchProfile(user.id);
+        }
+      } catch (err) {
+        console.error("Error getting user:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     getUser();
 

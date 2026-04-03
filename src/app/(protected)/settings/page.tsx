@@ -1,21 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
-import { Settings, Moon, Sun, Monitor, Globe, Target, Clock, Save, CheckCircle2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { Settings, Moon, Sun, Monitor, Globe, Target, Clock, Save, CheckCircle2, Loader2 } from "lucide-react";
 
 export default function SettingsPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const supabase = useMemo(() => createClient(), []);
   const [language, setLanguage] = useState(profile?.language_preference || "id");
   const [dailyTarget, setDailyTarget] = useState(profile?.daily_target_minutes || 60);
   const [studyGoal, setStudyGoal] = useState(profile?.study_goal || "");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      await supabase.from("profiles").update({
+        language_preference: language,
+        daily_target_minutes: dailyTarget,
+        study_goal: studyGoal,
+        theme_preference: theme,
+      }).eq("id", user.id);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error("Error saving settings:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -106,8 +123,8 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <button onClick={handleSave} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2">
-        {saved ? <><CheckCircle2 className="w-4 h-4" /> Tersimpan!</> : <><Save className="w-4 h-4" /> Simpan Pengaturan</>}
+      <button onClick={handleSave} disabled={saving} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+        {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : saved ? <><CheckCircle2 className="w-4 h-4" /> Tersimpan!</> : <><Save className="w-4 h-4" /> Simpan Pengaturan</>}
       </button>
     </div>
   );
