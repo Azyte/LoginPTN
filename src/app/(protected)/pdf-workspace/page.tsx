@@ -19,6 +19,7 @@ export default function PDFWorkspacePage() {
     if (!user) return;
     
     async function loadWorkspaceFiles() {
+      if (!user) return;
       const { data: memberGroups } = await supabase
         .from("group_members")
         .select("group_id")
