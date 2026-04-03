@@ -38,6 +38,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
 
 NEXT_PUBLIC_AI_AGENT_URL=your_ai_endpoint_url
 AI_AGENT_API_KEY=your_api_key
+
 3. Database Setup
 Gunakan file migrasi di supabase/migrations/ untuk setup tabel, RLS (Row Level Security), dan data awal universitas/subtes di instance Supabase kamu.
 
