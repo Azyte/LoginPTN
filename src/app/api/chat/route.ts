@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import pdfParse from "pdf-parse";
+// Gunakan require untuk modul CommonJS lawas agar tidak crash di Turbopack
+const pdfParse = require("pdf-parse");
 
 export async function POST(request: Request) {
   try {
