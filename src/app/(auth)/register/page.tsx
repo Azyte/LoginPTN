@@ -298,6 +298,11 @@ export default function RegisterPage() {
 
           {step === 3 && (
             <form onSubmit={handleRegister} className="space-y-4">
+              {error && (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl p-3">
+                  {error}
+                </div>
+              )}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input type="text" value={majorSearch} onChange={(e) => setMajorSearch(e.target.value)} className="w-full bg-secondary/50 border border-border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all" placeholder="Cari jurusan..." />
