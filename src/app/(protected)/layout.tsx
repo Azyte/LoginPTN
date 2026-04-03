@@ -11,6 +11,7 @@ import {
   LogOut, Menu, X, ChevronLeft, Moon, Sun, Bell
 } from "lucide-react";
 import { getInitials } from "@/lib/utils";
+import { PomodoroWidget } from "@/components/ui/Pomodoro";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -169,7 +170,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page Content */}
-        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="p-4 sm:p-6 lg:p-8">
+          {children}
+        </main>
+        
+        {/* Pomodoro Timer available on all protected pages */}
+        <PomodoroWidget />
       </div>
     </div>
   );

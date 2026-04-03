@@ -11,8 +11,8 @@ export default function PDFWorkspacePage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
-  const [files, setFiles] = useState<{ id: string; name: string; size: string; uploadedAt: string }[]>([]);
-  const [selectedFile, setSelectedFile] = useState<{ id: string; name: string } | null>(null);
+  const [files, setFiles] = useState<{ id: string; name: string; size: string; uploadedAt: string; url: string }[]>([]);
+  const [selectedFile, setSelectedFile] = useState<{ id: string; name: string; url: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,7 +42,8 @@ export default function PDFWorkspacePage() {
             id: f.id,
             name: f.file_name || "Unknown File",
             size: f.file_size ? (f.file_size / 1024).toFixed(1) + " KB" : "Unknown",
-            uploadedAt: new Date(f.created_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'short' })
+            uploadedAt: new Date(f.created_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'short' }),
+            url: f.file_url || ""
          })));
       }
       setLoading(false);
@@ -53,8 +54,8 @@ export default function PDFWorkspacePage() {
   const fireAIPrompt = (promptTemplate: string) => {
     if (!selectedFile) return;
     const finalPrompt = promptTemplate.replace("{{FILE}}", selectedFile.name);
-    // Masukkan ke URL agar ditangkap oleh Halaman AI Assistant
-    router.push(`/ai-assistant?prompt=${encodeURIComponent(finalPrompt)}`);
+    // Masukkan ke URL agar ditangkap oleh Halaman AI Assistant beserta konteks file
+    router.push(`/ai-assistant?prompt=${encodeURIComponent(finalPrompt)}&fileUrl=${encodeURIComponent(selectedFile.url)}&fileName=${encodeURIComponent(selectedFile.name)}`);
   };
 
   const aiActions = [
@@ -87,7 +88,7 @@ export default function PDFWorkspacePage() {
              files.map((file) => (
                <button
                  key={file.id}
-                 onClick={() => setSelectedFile({ id: file.id, name: file.name })}
+                 onClick={() => setSelectedFile({ id: file.id, name: file.name, url: file.url })}
                  className={`w-full text-left p-4 rounded-xl border transition-all flex items-center gap-3 ${
                    selectedFile?.id === file.id ? "border-primary bg-primary/10 shadow-sm" : "border-border/50 bg-card hover:bg-secondary/50"
                  }`}

@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { SUBJECTS } from "@/lib/constants";
 import { Trophy, Target, Clock, TrendingUp, ArrowLeft, Download } from "lucide-react";
 import Link from "next/link";
+import confetti from "canvas-confetti";
 
 const RESULTS = {
   totalScore: 742,
@@ -24,6 +26,33 @@ const RESULTS = {
 
 export default function TryoutResultPage() {
   const scorePercent = (RESULTS.totalScore / RESULTS.maxScore) * 100;
+
+  useEffect(() => {
+    const duration = 2 * 1000;
+    const animationEnd = Date.now() + duration;
+
+    const frame = () => {
+      confetti({
+        particleCount: 5,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0 },
+        colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
+      });
+      confetti({
+        particleCount: 5,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1 },
+        colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
+      });
+
+      if (Date.now() < animationEnd) {
+        requestAnimationFrame(frame);
+      }
+    };
+    frame();
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

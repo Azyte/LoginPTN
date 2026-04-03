@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, Suspense } from "react";
-import { Bot, Send, Plus, MessageSquare, Loader2, Sparkles, Trash2, ArrowLeft } from "lucide-react";
+import { Bot, Send, Plus, MessageSquare, Loader2, Sparkles, Trash2, ArrowLeft, Download } from "lucide-react";
 import { sendAIMessage } from "@/lib/ai/agent";
 import type { AIMessage } from "@/lib/types";
 import { useAuth } from "@/providers/auth-provider";
@@ -19,6 +19,7 @@ function AIAssistantContent() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [attachedFile, setAttachedFile] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -86,20 +87,33 @@ function AIAssistantContent() {
     }
   };
 
+  const exportCatatan = (content: string) => {
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Catatan_AI_${new Date().getTime()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const newConversation = () => {
     const id = "temp-" + Date.now().toString();
     setConversations((prev) => [{ id, title: "Percakapan Baru", messages: [] }, ...prev]);
     setActiveConvId(id);
+    return id;
   };
 
-  const handleSend = async (forcedInitialMessage?: string) => {
+  const handleSend = async (forcedInitialMessage?: string, forcedConvId?: string, fileUrlParam?: string) => {
     const msgText = forcedInitialMessage || input.trim();
-    if (!msgText || loading || !user || !activeConvId) return;
+    let currentConvId = forcedConvId || activeConvId;
+    
+    if (!msgText || loading || !user || !currentConvId) return;
     
     setInput("");
     setLoading(true);
 
-    let currentConvId = activeConvId;
     let isNewConv = false;
     let convTitle = "Percakapan Baru";
 
@@ -113,11 +127,12 @@ function AIAssistantContent() {
       }).select().single();
 
       if (newDbConv) {
+        const oldId = currentConvId;
         currentConvId = newDbConv.id;
         setActiveConvId(newDbConv.id);
         // Replace temp ID di state
         setConversations(prev => prev.map(c => 
-          c.id === activeConvId ? { ...c, id: newDbConv.id, title: convTitle } : c
+          c.id === oldId ? { ...c, id: newDbConv.id, title: convTitle } : c
         ));
       }
     }
@@ -134,7 +149,7 @@ function AIAssistantContent() {
 
     try {
       const activeMessages = conversations.find(c => c.id === currentConvId)?.messages || [];
-      const responseText = await sendAIMessage(activeMessages, msgText);
+      const responseText = await sendAIMessage(activeMessages, msgText, fileUrlParam);
       
       const assistantMsg = { role: "assistant", content: responseText, conversation_id: currentConvId };
       const { data: savedAssistantMsg } = await supabase.from('ai_messages').insert(assistantMsg).select().single();
@@ -155,15 +170,20 @@ function AIAssistantContent() {
     }
     
     setLoading(false);
+    setAttachedFile(null); // Clear attachment state after process is complete
   };
 
   // Tangkap Auto-Prompt dari URL
   useEffect(() => {
     const promptQuery = searchParams.get('prompt');
+    const fileUrlObj = searchParams.get('fileUrl');
+    const fileNameObj = searchParams.get('fileName');
+
     if (promptQuery && !initialLoad && user) {
-       newConversation();
+       if (fileNameObj) setAttachedFile(fileNameObj);
+       const newId = newConversation();
        setTimeout(() => {
-         setInput(promptQuery);
+         handleSend(promptQuery, newId, fileUrlObj || undefined);
          // Cleanup URL param so it doesn't loop
          router.replace("/ai-assistant");
        }, 100);
@@ -244,19 +264,38 @@ function AIAssistantContent() {
 
           {activeConv?.messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[85%] px-5 py-3 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${
-                msg.role === "user" ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm" : "bg-secondary text-foreground rounded-2xl rounded-tl-sm"
-              }`}>
-                {msg.content}
+              <div className="flex flex-col gap-1 items-start max-w-[85%]">
+                <div className={`px-5 py-3 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${
+                  msg.role === "user" ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm self-end" : "bg-secondary text-foreground rounded-2xl rounded-tl-sm self-start"
+                }`}>
+                  {msg.content}
+                </div>
+                {msg.role === "assistant" && (
+                  <button 
+                    onClick={() => exportCatatan(msg.content)}
+                    className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-muted-foreground hover:text-primary transition-colors ml-2 mt-1"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Simpan Catatan
+                  </button>
+                )}
               </div>
             </div>
           ))}
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-secondary text-foreground rounded-2xl rounded-tl-sm px-5 py-3 flex items-center gap-3">
-                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground font-medium">Bentar ya, AI mikir dulu...</span>
+              <div className="bg-secondary text-foreground rounded-2xl rounded-tl-sm px-5 py-3 flex flex-col gap-2 min-w-[200px]">
+                {attachedFile && (
+                  <div className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-primary/20 w-max">
+                    <Sparkles className="w-3 h-3" /> Membaca {attachedFile}...
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground font-medium">
+                    {attachedFile ? "Mengekstrak teks PDF & menyusun jawaban..." : "Bentar ya, Kak AI mikir dulu..."}
+                  </span>
+                </div>
               </div>
             </div>
           )}

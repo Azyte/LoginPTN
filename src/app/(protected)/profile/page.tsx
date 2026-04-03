@@ -25,6 +25,7 @@ export default function ProfilePage() {
     target_university_id: "",
     target_major_id: "",
     daily_target_minutes: 60,
+    avatar_url: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -135,7 +136,7 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-secondary/30 p-4 rounded-xl border border-border/50">
             <div className="flex items-start gap-3 text-sm">
                <div className="bg-primary/10 p-2 rounded-lg text-primary"><Mail className="w-4 h-4" /></div>
-               <div className="flex-1 min-w-0"><div className="text-xs text-muted-foreground mb-0.5">Email</div><div className="truncate font-medium">{profile?.email || "email@example.com"}</div></div>
+               <div className="flex-1 min-w-0"><div className="text-xs text-muted-foreground mb-0.5">Email</div><div className="truncate font-medium">{user?.email || "email@example.com"}</div></div>
             </div>
             <div className="flex items-start gap-3 text-sm">
                <div className="bg-primary/10 p-2 rounded-lg text-primary"><School className="w-4 h-4" /></div>

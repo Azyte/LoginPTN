@@ -10,6 +10,19 @@ import {
 } from "lucide-react";
 import { getStreakEmoji } from "@/lib/utils";
 
+const AMBIS_QUOTES = [
+  "Keringat hari ini adalah senyum di kampus impian besok.",
+  "Sainganmu sedang belajar saat kamu tidur. Bangun dan kejar!",
+  "Satu hari tertunda, ribuan peringkat terlewat.",
+  "Bukan soal seberapa pintar, tapi seberapa konsisten.",
+  "Lelah itu wajar, tapi menyerah bukan pilihan.",
+  "Masa depanmu ditentukan oleh apa yang kamu lakukan hari ini.",
+  "SNBT tak kenal kata manja, ia hanya kenal siapa yang siap bertarung.",
+  "Sakitnya belajar hanya sebentar, gilanya kebodohan seumur hidup.",
+  "Tidur sedikit malam ini, agar nyenyak di Almamater Kuning esok hari.",
+  "Orang tua menunggu senyum lulusmu. Jangan hancurkan harapan mereka."
+];
+
 export default function DashboardPage() {
   const { profile } = useAuth();
   const supabase = useMemo(() => createClient(), []);
@@ -18,8 +31,11 @@ export default function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState<{ date: string; count: number }[]>([]);
   const [subjectProgress, setSubjectProgress] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quote, setQuote] = useState(AMBIS_QUOTES[0]);
 
   useEffect(() => {
+    setQuote(AMBIS_QUOTES[Math.floor(Math.random() * AMBIS_QUOTES.length)]);
+    
     async function loadDashboardData() {
       if (!profile) return;
       
@@ -147,7 +163,9 @@ export default function DashboardPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">
             {greeting()}, <span className="gradient-text">{profile?.name?.split(" ")[0] || "Pejuang PTN"}</span>! 👋
           </h1>
-          <p className="text-muted-foreground mt-1">Yuk lanjutkan perjuanganmu hari ini</p>
+          <p className="text-muted-foreground mt-2 italic flex items-center gap-2">
+            <Flame className="w-4 h-4 text-warning" /> "{quote}"
+          </p>
         </div>
         <div className="flex items-center gap-2 bg-card border border-border/50 rounded-2xl px-5 py-3 shadow-sm">
           <span className="text-2xl">{getStreakEmoji(stats.streak)}</span>
