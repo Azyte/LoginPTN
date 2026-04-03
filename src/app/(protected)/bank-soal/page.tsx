@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { SUBJECTS } from "@/lib/constants";
 import { getDifficultyBg } from "@/lib/utils";
-import { BookOpen, Filter, Bookmark, BookmarkCheck, CheckCircle2, XCircle, ChevronDown, Search, Sparkles } from "lucide-react";
+import { BookOpen, Filter, Bookmark, BookmarkCheck, CheckCircle2, XCircle, ChevronDown, Search, Sparkles, RotateCcw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -21,12 +21,15 @@ export default function BankSoalPage() {
 
   useEffect(() => {
     async function fetchQuestions() {
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*, subjects(code)')
-        .order('created_at', { ascending: false });
+      try {
+        // 1. Ambil semua soal
+        const { data } = await supabase
+          .from('questions')
+          .select('*, subjects(code)')
+          .order('created_at', { ascending: false });
 
-      if (data) {
+        if (!data) { setLoading(false); return; }
+
         const formatted = data.map(q => {
           const letters = ['A', 'B', 'C', 'D', 'E'];
           const mappedOps = Array.isArray(q.options) 
@@ -60,11 +63,51 @@ export default function BankSoalPage() {
           };
         });
         setQuestions(formatted);
+
+        // 2. Ambil jawaban sebelumnya dari user (jika sudah login)
+        if (user) {
+          const { data: prevAnswers } = await supabase
+            .from('user_answers')
+            .select('question_id, answer, is_correct')
+            .eq('user_id', user.id);
+
+          if (prevAnswers && prevAnswers.length > 0) {
+            const restored: Record<string, { selected: string; revealed: boolean }> = {};
+            prevAnswers.forEach((pa: any) => {
+              // Ambil jawaban terbaru saja (yang terakhir dimasukkan)
+              let selectedKey = '';
+              try {
+                selectedKey = typeof pa.answer === 'string' ? JSON.parse(pa.answer) : pa.answer;
+                if (typeof selectedKey !== 'string') selectedKey = String(selectedKey);
+              } catch {
+                selectedKey = String(pa.answer || '');
+              }
+              // Hanya simpan jika belum ada (agar yang terbaru menang jika duplikat)
+              if (!restored[pa.question_id]) {
+                restored[pa.question_id] = { selected: selectedKey, revealed: true };
+              }
+            });
+            setAnswers(restored);
+          }
+
+          // 3. Ambil bookmarks
+          const { data: bkmData } = await supabase
+            .from('bookmarks')
+            .select('question_id')
+            .eq('user_id', user.id);
+
+          if (bkmData) {
+            setBookmarks(new Set(bkmData.map((b: any) => b.question_id)));
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching bank soal:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     fetchQuestions();
-  }, [supabase]);
+  }, [supabase, user]);
 
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
@@ -120,6 +163,23 @@ export default function BankSoalPage() {
     }
   };
 
+  // Reset jawaban sebelumnya untuk mengerjakan ulang
+  const retryQuestion = (questionId: string) => {
+    setAnswers((prev) => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+  };
+
+  // Statistik
+  const answeredCount = Object.values(answers).filter(a => a.revealed).length;
+  const correctCount = Object.entries(answers).filter(([qId, a]) => {
+    if (!a.revealed) return false;
+    const q = questions.find(x => x.id === qId);
+    return q && a.selected === q.correct;
+  }).length;
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -173,7 +233,12 @@ export default function BankSoalPage() {
         <span>•</span>
         <span>{bookmarks.size} dibookmark</span>
         <span>•</span>
-        <span>{Object.values(answers).filter((a) => a.revealed).length} dijawab</span>
+        <span className="flex items-center gap-1">
+          {answeredCount} dijawab
+          {answeredCount > 0 && (
+            <span className="text-success font-semibold ml-1">({correctCount}/{answeredCount} benar)</span>
+          )}
+        </span>
       </div>
 
       {/* Questions */}
@@ -197,7 +262,7 @@ export default function BankSoalPage() {
             >
               {/* Question Header */}
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-bold text-muted-foreground">#{idx + 1}</span>
                   <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
                     {subjectData?.icon} {q.subject}
@@ -205,17 +270,35 @@ export default function BankSoalPage() {
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${getDifficultyBg(q.difficulty)}`}>
                     {q.difficulty === "easy" ? "Mudah" : q.difficulty === "medium" ? "Sedang" : "Sulit"}
                   </span>
-                </div>
-                <button
-                  onClick={() => toggleBookmark(q.id)}
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                >
-                  {bookmarks.has(q.id) ? (
-                    <BookmarkCheck className="w-5 h-5 text-primary" />
-                  ) : (
-                    <Bookmark className="w-5 h-5" />
+                  {/* Badge sudah dijawab */}
+                  {isRevealed && (
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${isCorrect ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
+                      {isCorrect ? "✓ Benar" : "✗ Salah"}
+                    </span>
                   )}
-                </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Tombol kerjakan ulang */}
+                  {isRevealed && (
+                    <button
+                      onClick={() => retryQuestion(q.id)}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      title="Kerjakan Ulang"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => toggleBookmark(q.id)}
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {bookmarks.has(q.id) ? (
+                      <BookmarkCheck className="w-5 h-5 text-primary" />
+                    ) : (
+                      <Bookmark className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Question Content */}
