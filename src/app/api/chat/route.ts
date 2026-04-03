@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-// Gunakan require untuk modul CommonJS lawas agar tidak crash di Turbopack
-const pdfParse = require("pdf-parse");
+
+export const dynamic = 'force-dynamic'; // Hindari masalah static build
 
 export async function POST(request: Request) {
+  // Pindahkan require ke dalam scope fungsi agar tidak dieksekusi saat proses "next build" (Build Time)
+  const pdfParse = require("pdf-parse");
   try {
     const { messages, userMessage, fileUrl } = await request.json();
 
