@@ -6,14 +6,107 @@ import { User, Mail, School, Target, Trophy, BookOpen, Calendar, Edit2, Loader2,
 import { getInitials } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
+// === HARDCODED DATA (sama seperti register) agar tidak bergantung DB kosong ===
+const UNIVERSITIES = [
+  { id: 1, name: "Universitas Indonesia", short: "UI", location: "Depok, Jawa Barat" },
+  { id: 2, name: "Universitas Gadjah Mada", short: "UGM", location: "Yogyakarta" },
+  { id: 3, name: "Institut Teknologi Bandung", short: "ITB", location: "Bandung, Jawa Barat" },
+  { id: 4, name: "Universitas Airlangga", short: "UNAIR", location: "Surabaya, Jawa Timur" },
+  { id: 5, name: "Institut Teknologi Sepuluh Nopember", short: "ITS", location: "Surabaya, Jawa Timur" },
+  { id: 6, name: "Universitas Diponegoro", short: "UNDIP", location: "Semarang, Jawa Tengah" },
+  { id: 7, name: "Universitas Padjadjaran", short: "UNPAD", location: "Bandung, Jawa Barat" },
+  { id: 8, name: "Universitas Brawijaya", short: "UB", location: "Malang, Jawa Timur" },
+  { id: 9, name: "Institut Pertanian Bogor", short: "IPB", location: "Bogor, Jawa Barat" },
+  { id: 10, name: "Universitas Hasanuddin", short: "UNHAS", location: "Makassar, Sulawesi Selatan" },
+  { id: 11, name: "Universitas Sebelas Maret", short: "UNS", location: "Surakarta, Jawa Tengah" },
+  { id: 12, name: "Universitas Sumatera Utara", short: "USU", location: "Medan, Sumatera Utara" },
+  { id: 13, name: "Universitas Andalas", short: "UNAND", location: "Padang, Sumatera Barat" },
+  { id: 14, name: "Universitas Negeri Yogyakarta", short: "UNY", location: "Yogyakarta" },
+  { id: 15, name: "Universitas Negeri Malang", short: "UM", location: "Malang, Jawa Timur" },
+  { id: 16, name: "Universitas Pendidikan Indonesia", short: "UPI", location: "Bandung, Jawa Barat" },
+  { id: 17, name: "Universitas Negeri Semarang", short: "UNNES", location: "Semarang, Jawa Tengah" },
+  { id: 18, name: "Universitas Negeri Surabaya", short: "UNESA", location: "Surabaya, Jawa Timur" },
+  { id: 19, name: "Universitas Jember", short: "UNEJ", location: "Jember, Jawa Timur" },
+  { id: 20, name: "Universitas Lampung", short: "UNILA", location: "Bandar Lampung" },
+  { id: 21, name: "Universitas Sriwijaya", short: "UNSRI", location: "Palembang, Sumatera Selatan" },
+  { id: 22, name: "Universitas Riau", short: "UNRI", location: "Pekanbaru, Riau" },
+  { id: 23, name: "Universitas Udayana", short: "UNUD", location: "Bali" },
+  { id: 24, name: "Universitas Negeri Jakarta", short: "UNJ", location: "Jakarta" },
+  { id: 25, name: "Universitas Syiah Kuala", short: "USK", location: "Banda Aceh" },
+];
+
+const MAJORS_MAP: Record<number, { id: number; name: string; faculty: string }[]> = {
+  1: [
+    { id: 1, name: "Kedokteran", faculty: "FK" },
+    { id: 2, name: "Hukum", faculty: "FH" },
+    { id: 3, name: "Teknik Informatika", faculty: "Fasilkom" },
+    { id: 4, name: "Manajemen", faculty: "FEB" },
+    { id: 5, name: "Akuntansi", faculty: "FEB" },
+    { id: 6, name: "Psikologi", faculty: "FPsi" },
+    { id: 7, name: "Ilmu Komunikasi", faculty: "FISIP" },
+    { id: 8, name: "Farmasi", faculty: "FF" },
+  ],
+  2: [
+    { id: 9, name: "Kedokteran", faculty: "FK" },
+    { id: 10, name: "Teknik Elektro", faculty: "FT" },
+    { id: 11, name: "Ilmu Hukum", faculty: "FH" },
+    { id: 12, name: "Akuntansi", faculty: "FEB" },
+    { id: 13, name: "Psikologi", faculty: "FPsi" },
+    { id: 14, name: "Ilmu Komputer", faculty: "FMIPA" },
+    { id: 15, name: "Hubungan Internasional", faculty: "FISIP" },
+  ],
+  3: [
+    { id: 16, name: "Teknik Informatika", faculty: "STEI" },
+    { id: 17, name: "Teknik Elektro", faculty: "STEI" },
+    { id: 18, name: "Teknik Mesin", faculty: "FTI" },
+    { id: 19, name: "Teknik Sipil", faculty: "FTSL" },
+    { id: 20, name: "Arsitektur", faculty: "SAPPK" },
+    { id: 21, name: "Matematika", faculty: "FMIPA" },
+    { id: 22, name: "Desain Komunikasi Visual", faculty: "FSRD" },
+  ],
+  4: [
+    { id: 23, name: "Kedokteran", faculty: "FK" },
+    { id: 24, name: "Farmasi", faculty: "FF" },
+    { id: 25, name: "Psikologi", faculty: "FPsi" },
+    { id: 26, name: "Hukum", faculty: "FH" },
+    { id: 27, name: "Manajemen", faculty: "FEB" },
+    { id: 28, name: "Kedokteran Gigi", faculty: "FKG" },
+  ],
+  5: [
+    { id: 29, name: "Teknik Informatika", faculty: "FTI" },
+    { id: 30, name: "Teknik Elektro", faculty: "FTE" },
+    { id: 31, name: "Teknik Mesin", faculty: "FTI" },
+    { id: 32, name: "Teknik Sipil", faculty: "FTSPK" },
+    { id: 33, name: "Desain Produk Industri", faculty: "FADP" },
+    { id: 34, name: "Arsitektur", faculty: "FADP" },
+  ],
+};
+
+// Generate default majors for remaining universities
+for (let i = 6; i <= 25; i++) {
+  if (!MAJORS_MAP[i]) {
+    MAJORS_MAP[i] = [
+      { id: i * 100 + 1, name: "Kedokteran", faculty: "FK" },
+      { id: i * 100 + 2, name: "Teknik Informatika", faculty: "FT" },
+      { id: i * 100 + 3, name: "Hukum", faculty: "FH" },
+      { id: i * 100 + 4, name: "Manajemen", faculty: "FEB" },
+      { id: i * 100 + 5, name: "Psikologi", faculty: "FPsi" },
+      { id: i * 100 + 6, name: "Farmasi", faculty: "FF" },
+    ];
+  }
+}
+
+// Flatten all majors for reverse lookup
+const ALL_MAJORS_FLAT = Object.entries(MAJORS_MAP).flatMap(([uniId, majors]) =>
+  majors.map(m => ({ ...m, university_id: parseInt(uniId) }))
+);
+
 export default function ProfilePage() {
   const { profile, user } = useAuth();
   const supabase = useMemo(() => createClient(), []);
 
   const [stats, setStats] = useState({ answered: 0, tryouts: 0, streak: 0 });
   const [earnedBadges, setEarnedBadges] = useState<any[]>([]);
-  const [universities, setUniversities] = useState<any[]>([]);
-  const [allMajors, setAllMajors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Edit form state
@@ -28,38 +121,37 @@ export default function ProfilePage() {
     avatar_url: "",
   });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     async function loadData() {
-      if (!user) return;
+      if (!user) { setLoading(false); return; }
 
-      const [
-        { count: answeredCount },
-        { count: tryoutCount },
-        { data: streakData },
-        { data: badgesData },
-        { data: uniData },
-        { data: majorsData }
-      ] = await Promise.all([
-        supabase.from("user_answers").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("tryout_attempts").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "completed"),
-        supabase.from("user_streaks").select("current_streak").eq("user_id", user.id).maybeSingle(),
-        supabase.from("user_badges").select("*, badge:badges(*)").eq("user_id", user.id),
-        supabase.from("universities").select("*").order("name"),
-        supabase.from("majors").select("*").order("name")
-      ]);
+      try {
+        const [
+          { count: answeredCount },
+          { count: tryoutCount },
+          { data: streakData },
+          { data: badgesData },
+        ] = await Promise.all([
+          supabase.from("user_answers").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+          supabase.from("tryout_attempts").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "completed"),
+          supabase.from("user_streaks").select("current_streak").eq("user_id", user.id).maybeSingle(),
+          supabase.from("user_badges").select("*, badge:badges(*)").eq("user_id", user.id),
+        ]);
 
-      setStats({
-        answered: answeredCount || 0,
-        tryouts: tryoutCount || 0,
-        streak: streakData?.current_streak || 0
-      });
+        setStats({
+          answered: answeredCount || 0,
+          tryouts: tryoutCount || 0,
+          streak: streakData?.current_streak || 0
+        });
 
-      if (badgesData) setEarnedBadges(badgesData.map(b => b.badge).filter(Boolean));
-      if (uniData) setUniversities(uniData);
-      if (majorsData) setAllMajors(majorsData);
-
-      setLoading(false);
+        if (badgesData) setEarnedBadges(badgesData.map((b: any) => b.badge).filter(Boolean));
+      } catch (err) {
+        console.error("Error loading profile data:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, [user, supabase]);
@@ -82,27 +174,39 @@ export default function ProfilePage() {
     e.preventDefault();
     if (!user) return;
     setSaving(true);
-    
-    await supabase.from("profiles").update({
-      name: editForm.name,
-      bio: editForm.bio,
-      school: editForm.school,
-      target_university_id: editForm.target_university_id ? parseInt(editForm.target_university_id) : null,
-      target_major_id: editForm.target_major_id ? parseInt(editForm.target_major_id) : null,
-      daily_target_minutes: editForm.daily_target_minutes,
-      avatar_url: editForm.avatar_url
-    }).eq("id", user.id);
+    setSaveError("");
 
-    // Hard refresh context logic requires full reload or custom state injection
-    window.location.reload(); 
+    try {
+      const { error } = await supabase.from("profiles").update({
+        name: editForm.name,
+        bio: editForm.bio,
+        school: editForm.school,
+        target_university_id: editForm.target_university_id ? parseInt(editForm.target_university_id) : null,
+        target_major_id: editForm.target_major_id ? parseInt(editForm.target_major_id) : null,
+        daily_target_minutes: editForm.daily_target_minutes,
+        avatar_url: editForm.avatar_url
+      }).eq("id", user.id);
+
+      if (error) {
+        setSaveError(error.message);
+        setSaving(false);
+        return;
+      }
+
+      window.location.reload();
+    } catch (err: any) {
+      setSaveError(err.message || "Gagal menyimpan profil.");
+      setSaving(false);
+    }
   };
 
-  const targetUni = universities.find(u => u.id === profile?.target_university_id);
-  const targetMajor = allMajors.find(m => m.id === profile?.target_major_id);
+  // Lookup PTN & Jurusan from hardcoded data
+  const targetUni = UNIVERSITIES.find(u => u.id === profile?.target_university_id);
+  const targetMajor = ALL_MAJORS_FLAT.find(m => m.id === profile?.target_major_id);
 
-  // Filter majors for dropdown
-  const availableEditMajors = editForm.target_university_id 
-    ? allMajors.filter(m => m.university_id.toString() === editForm.target_university_id)
+  // Filter majors for dropdown based on selected university
+  const availableEditMajors = editForm.target_university_id
+    ? (MAJORS_MAP[parseInt(editForm.target_university_id)] || [])
     : [];
 
   return (
@@ -123,7 +227,7 @@ export default function ProfilePage() {
               <h1 className="text-2xl font-bold">{profile?.name || "Pengguna"}</h1>
               <p className="text-sm text-muted-foreground capitalize">{profile?.role || "student"} • Bersiap untuk {new Date().getFullYear()}</p>
             </div>
-            <button 
+            <button
               onClick={() => setIsEditOpen(true)}
               className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-secondary/80 transition-colors w-full sm:w-auto"
             >
@@ -144,7 +248,7 @@ export default function ProfilePage() {
             </div>
             <div className="flex items-start gap-3 text-sm">
                <div className="bg-primary/10 p-2 rounded-lg text-primary"><Target className="w-4 h-4" /></div>
-               <div className="flex-1 min-w-0"><div className="text-xs text-muted-foreground mb-0.5">Target Impian</div><div className="truncate font-medium" title={targetUni ? `${targetUni.name} - ${targetMajor?.name}` : "Belum memilih PTN"}>{targetUni ? `${targetUni.short_name} - ${targetMajor?.name || "Jurusan"}` : "Kosong"}</div></div>
+               <div className="flex-1 min-w-0"><div className="text-xs text-muted-foreground mb-0.5">Target Impian</div><div className="truncate font-medium" title={targetUni ? `${targetUni.name} - ${targetMajor?.name}` : "Belum memilih PTN"}>{targetUni ? `${targetUni.short} - ${targetMajor?.name || "Jurusan"}` : "Kosong"}</div></div>
             </div>
             <div className="flex items-start gap-3 text-sm">
                <div className="bg-primary/10 p-2 rounded-lg text-primary"><Calendar className="w-4 h-4" /></div>
@@ -176,7 +280,11 @@ export default function ProfilePage() {
       {/* Badges */}
       <div className="bg-card border border-border/50 rounded-2xl p-6">
         <h2 className="text-lg font-semibold mb-6 flex items-center gap-2"><Trophy className="w-5 h-5 text-warning" /> Badge Peringkat & Prestasi</h2>
-        {earnedBadges.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : earnedBadges.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground bg-secondary/30 rounded-xl border border-dashed border-border/50">
             <Trophy className="w-10 h-10 mx-auto mb-3 opacity-20" />
             <p>Belum ada badge yang dikumpulkan.</p>
@@ -204,23 +312,29 @@ export default function ProfilePage() {
           <div className="relative bg-card border border-border/50 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
             <button onClick={() => setIsEditOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:bg-secondary p-1 rounded-full"><X className="w-5 h-5" /></button>
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Edit2 className="w-5 h-5 text-primary" /> Edit Profile</h2>
-            
+
             <form onSubmit={handleSave} className="space-y-4">
+              {saveError && (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl p-3">
+                  {saveError}
+                </div>
+              )}
+
               <div>
                 <label className="text-xs font-bold text-muted-foreground mb-1 block">URL Foto Profil</label>
-                <input 
-                  type="text" 
-                  value={editForm.avatar_url} 
+                <input
+                  type="text"
+                  value={editForm.avatar_url}
                   onChange={e => setEditForm({...editForm, avatar_url: e.target.value})}
                   className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 mb-2"
                   placeholder="https://... atau pilih avatar di bawah"
                 />
                 <div className="flex gap-2">
                    {['Felix', 'Aneka', 'Oliver', 'Mimi', 'Jasper', 'Midnight'].map(seed => (
-                      <button 
-                        type="button" 
-                        key={seed} 
-                        onClick={() => setEditForm({...editForm, avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`})} 
+                      <button
+                        type="button"
+                        key={seed}
+                        onClick={() => setEditForm({...editForm, avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`})}
                         className="w-8 h-8 rounded-full bg-secondary overflow-hidden hover:opacity-80 transition"
                       >
                          <img src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`} alt={seed} />
@@ -233,7 +347,7 @@ export default function ProfilePage() {
                 <label className="text-sm font-medium mb-1 block">Nama Lengkap</label>
                 <input required type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50" />
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium mb-1 block">Bio & Target</label>
                 <textarea rows={2} value={editForm.bio} onChange={e => setEditForm({...editForm, bio: e.target.value})} className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 resize-none" placeholder="Tulis bio singkatmu..." />
@@ -249,14 +363,14 @@ export default function ProfilePage() {
                   <label className="text-sm font-medium mb-1 block">Target Kampus</label>
                   <select value={editForm.target_university_id} onChange={e => setEditForm({...editForm, target_university_id: e.target.value, target_major_id: ""})} className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50">
                     <option value="">Pilih PTN...</option>
-                    {universities.map(u => <option key={u.id} value={u.id}>{u.short_name} - {u.name}</option>)}
+                    {UNIVERSITIES.map(u => <option key={u.id} value={u.id}>{u.short} - {u.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Target Jurusan</label>
                   <select value={editForm.target_major_id} onChange={e => setEditForm({...editForm, target_major_id: e.target.value})} disabled={!editForm.target_university_id} className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50">
                     <option value="">Pilih Jurusan...</option>
-                    {availableEditMajors.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    {availableEditMajors.map(m => <option key={m.id} value={m.id}>{m.name} ({m.faculty})</option>)}
                   </select>
                 </div>
               </div>
