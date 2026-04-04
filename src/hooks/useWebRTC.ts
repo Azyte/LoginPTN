@@ -228,8 +228,20 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
         event: "webrtc_signal",
         payload: { sender: userId, signal: { type: "leave" } }
       });
+      try {
+        channelRef.current.untrack();
+      } catch { /* ignore */ }
     }
-    cleanup();
+    
+    // Stop local streams and peers but DONT unsubscribe the channel so presence still works
+    Object.values(peersRef.current).forEach(peer => peer.close());
+    peersRef.current = {};
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(t => t.stop());
+    }
+    setLocalStream(null);
+    setRemoteStreams({});
+    setIsVoiceConnected(false);
   };
 
   return {
