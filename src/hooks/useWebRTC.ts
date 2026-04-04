@@ -115,6 +115,13 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
           delete next[sender];
           return next;
         });
+        
+        // Eagerly remove from online users so they vanish from the UI instantly
+        setOnlineUsers(prev => {
+          const next = { ...prev };
+          delete next[sender];
+          return next;
+        });
       }
     });
 
@@ -221,7 +228,7 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
     }
   };
 
-  const leaveVoiceChannel = () => {
+  const leaveVoiceChannel = async () => {
     if (channelRef.current) {
       channelRef.current.send({
         type: "broadcast",
@@ -229,7 +236,7 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
         payload: { sender: userId, signal: { type: "leave" } }
       });
       try {
-        channelRef.current.untrack();
+        await channelRef.current.untrack();
       } catch { /* ignore */ }
     }
     
