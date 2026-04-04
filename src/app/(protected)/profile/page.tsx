@@ -1,103 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/providers/auth-provider";
-import { User, Mail, School, Target, Trophy, BookOpen, Calendar, Edit2, Loader2, X } from "lucide-react";
+import { User, Mail, School, Target, Trophy, BookOpen, Calendar, Edit2, Loader2, X, Upload, Camera } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-
-// === HARDCODED DATA (sama seperti register) agar tidak bergantung DB kosong ===
-const UNIVERSITIES = [
-  { id: 1, name: "Universitas Indonesia", short: "UI", location: "Depok, Jawa Barat" },
-  { id: 2, name: "Universitas Gadjah Mada", short: "UGM", location: "Yogyakarta" },
-  { id: 3, name: "Institut Teknologi Bandung", short: "ITB", location: "Bandung, Jawa Barat" },
-  { id: 4, name: "Universitas Airlangga", short: "UNAIR", location: "Surabaya, Jawa Timur" },
-  { id: 5, name: "Institut Teknologi Sepuluh Nopember", short: "ITS", location: "Surabaya, Jawa Timur" },
-  { id: 6, name: "Universitas Diponegoro", short: "UNDIP", location: "Semarang, Jawa Tengah" },
-  { id: 7, name: "Universitas Padjadjaran", short: "UNPAD", location: "Bandung, Jawa Barat" },
-  { id: 8, name: "Universitas Brawijaya", short: "UB", location: "Malang, Jawa Timur" },
-  { id: 9, name: "Institut Pertanian Bogor", short: "IPB", location: "Bogor, Jawa Barat" },
-  { id: 10, name: "Universitas Hasanuddin", short: "UNHAS", location: "Makassar, Sulawesi Selatan" },
-  { id: 11, name: "Universitas Sebelas Maret", short: "UNS", location: "Surakarta, Jawa Tengah" },
-  { id: 12, name: "Universitas Sumatera Utara", short: "USU", location: "Medan, Sumatera Utara" },
-  { id: 13, name: "Universitas Andalas", short: "UNAND", location: "Padang, Sumatera Barat" },
-  { id: 14, name: "Universitas Negeri Yogyakarta", short: "UNY", location: "Yogyakarta" },
-  { id: 15, name: "Universitas Negeri Malang", short: "UM", location: "Malang, Jawa Timur" },
-  { id: 16, name: "Universitas Pendidikan Indonesia", short: "UPI", location: "Bandung, Jawa Barat" },
-  { id: 17, name: "Universitas Negeri Semarang", short: "UNNES", location: "Semarang, Jawa Tengah" },
-  { id: 18, name: "Universitas Negeri Surabaya", short: "UNESA", location: "Surabaya, Jawa Timur" },
-  { id: 19, name: "Universitas Jember", short: "UNEJ", location: "Jember, Jawa Timur" },
-  { id: 20, name: "Universitas Lampung", short: "UNILA", location: "Bandar Lampung" },
-  { id: 21, name: "Universitas Sriwijaya", short: "UNSRI", location: "Palembang, Sumatera Selatan" },
-  { id: 22, name: "Universitas Riau", short: "UNRI", location: "Pekanbaru, Riau" },
-  { id: 23, name: "Universitas Udayana", short: "UNUD", location: "Bali" },
-  { id: 24, name: "Universitas Negeri Jakarta", short: "UNJ", location: "Jakarta" },
-  { id: 25, name: "Universitas Syiah Kuala", short: "USK", location: "Banda Aceh" },
-];
-
-const MAJORS_MAP: Record<number, { id: number; name: string; faculty: string }[]> = {
-  1: [
-    { id: 1, name: "Kedokteran", faculty: "FK" },
-    { id: 2, name: "Hukum", faculty: "FH" },
-    { id: 3, name: "Teknik Informatika", faculty: "Fasilkom" },
-    { id: 4, name: "Manajemen", faculty: "FEB" },
-    { id: 5, name: "Akuntansi", faculty: "FEB" },
-    { id: 6, name: "Psikologi", faculty: "FPsi" },
-    { id: 7, name: "Ilmu Komunikasi", faculty: "FISIP" },
-    { id: 8, name: "Farmasi", faculty: "FF" },
-  ],
-  2: [
-    { id: 9, name: "Kedokteran", faculty: "FK" },
-    { id: 10, name: "Teknik Elektro", faculty: "FT" },
-    { id: 11, name: "Ilmu Hukum", faculty: "FH" },
-    { id: 12, name: "Akuntansi", faculty: "FEB" },
-    { id: 13, name: "Psikologi", faculty: "FPsi" },
-    { id: 14, name: "Ilmu Komputer", faculty: "FMIPA" },
-    { id: 15, name: "Hubungan Internasional", faculty: "FISIP" },
-  ],
-  3: [
-    { id: 16, name: "Teknik Informatika", faculty: "STEI" },
-    { id: 17, name: "Teknik Elektro", faculty: "STEI" },
-    { id: 18, name: "Teknik Mesin", faculty: "FTI" },
-    { id: 19, name: "Teknik Sipil", faculty: "FTSL" },
-    { id: 20, name: "Arsitektur", faculty: "SAPPK" },
-    { id: 21, name: "Matematika", faculty: "FMIPA" },
-    { id: 22, name: "Desain Komunikasi Visual", faculty: "FSRD" },
-  ],
-  4: [
-    { id: 23, name: "Kedokteran", faculty: "FK" },
-    { id: 24, name: "Farmasi", faculty: "FF" },
-    { id: 25, name: "Psikologi", faculty: "FPsi" },
-    { id: 26, name: "Hukum", faculty: "FH" },
-    { id: 27, name: "Manajemen", faculty: "FEB" },
-    { id: 28, name: "Kedokteran Gigi", faculty: "FKG" },
-  ],
-  5: [
-    { id: 29, name: "Teknik Informatika", faculty: "FTI" },
-    { id: 30, name: "Teknik Elektro", faculty: "FTE" },
-    { id: 31, name: "Teknik Mesin", faculty: "FTI" },
-    { id: 32, name: "Teknik Sipil", faculty: "FTSPK" },
-    { id: 33, name: "Desain Produk Industri", faculty: "FADP" },
-    { id: 34, name: "Arsitektur", faculty: "FADP" },
-  ],
-};
-
-// Generate default majors for remaining universities
-for (let i = 6; i <= 25; i++) {
-  if (!MAJORS_MAP[i]) {
-    MAJORS_MAP[i] = [
-      { id: i * 100 + 1, name: "Kedokteran", faculty: "FK" },
-      { id: i * 100 + 2, name: "Teknik Informatika", faculty: "FT" },
-      { id: i * 100 + 3, name: "Hukum", faculty: "FH" },
-      { id: i * 100 + 4, name: "Manajemen", faculty: "FEB" },
-      { id: i * 100 + 5, name: "Psikologi", faculty: "FPsi" },
-      { id: i * 100 + 6, name: "Farmasi", faculty: "FF" },
-    ];
-  }
-}
+import { UNIVERSITIES, MAJORS } from "@/lib/constants";
 
 // Flatten all majors for reverse lookup
-const ALL_MAJORS_FLAT = Object.entries(MAJORS_MAP).flatMap(([uniId, majors]) =>
+const ALL_MAJORS_FLAT = Object.entries(MAJORS).flatMap(([uniId, majors]) =>
   majors.map(m => ({ ...m, university_id: parseInt(uniId) }))
 );
 
@@ -111,6 +22,9 @@ export default function ProfilePage() {
 
   // Edit form state
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [editForm, setEditForm] = useState({
     name: "",
     bio: "",
@@ -202,13 +116,35 @@ export default function ProfilePage() {
     }
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    
+    setUploadingPhoto(true);
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+    
+    try {
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+      if (uploadError) throw uploadError;
+      
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      setEditForm(prev => ({ ...prev, avatar_url: data.publicUrl }));
+    } catch (err: any) {
+      alert("Gagal mengunggah foto: " + err.message);
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   // Lookup PTN & Jurusan from hardcoded data
   const targetUni = UNIVERSITIES.find(u => u.id === profile?.target_university_id);
   const targetMajor = ALL_MAJORS_FLAT.find(m => m.id === profile?.target_major_id);
 
   // Filter majors for dropdown based on selected university
   const availableEditMajors = editForm.target_university_id
-    ? (MAJORS_MAP[parseInt(editForm.target_university_id)] || [])
+    ? (MAJORS[parseInt(editForm.target_university_id)] || [])
     : [];
 
   return (
@@ -323,25 +259,41 @@ export default function ProfilePage() {
               )}
 
               <div>
-                <label className="text-xs font-bold text-muted-foreground mb-1 block">URL Foto Profil</label>
-                <input
-                  type="text"
-                  value={editForm.avatar_url}
-                  onChange={e => setEditForm({...editForm, avatar_url: e.target.value})}
-                  className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 mb-2"
-                  placeholder="https://... atau pilih avatar di bawah"
-                />
-                <div className="flex gap-2">
-                   {['Felix', 'Aneka', 'Oliver', 'Mimi', 'Jasper', 'Midnight'].map(seed => (
-                      <button
-                        type="button"
-                        key={seed}
-                        onClick={() => setEditForm({...editForm, avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`})}
-                        className="w-8 h-8 rounded-full bg-secondary overflow-hidden hover:opacity-80 transition"
-                      >
-                         <img src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`} alt={seed} />
-                      </button>
-                   ))}
+                <label className="text-xs font-bold text-muted-foreground mb-3 block">Foto Profil</label>
+                <div className="flex flex-col sm:flex-row gap-4 mb-2 items-center sm:items-start">
+                  <div className="relative w-20 h-20 rounded-full bg-secondary overflow-hidden border-2 border-border shrink-0">
+                    {editForm.avatar_url ? (
+                       <img src={editForm.avatar_url} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                       <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Camera className="w-6 h-6" /></div>
+                    )}
+                  </div>
+                  <div className="flex-1 w-full space-y-3">
+                    <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
+                    <button 
+                      type="button" 
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none hover:bg-secondary/80 focus:ring-2 focus:ring-primary/50 flex items-center justify-center gap-2 font-medium transition-colors"
+                    >
+                      {uploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4"/>}
+                      {uploadingPhoto ? "Mengunggah..." : "Unggah dari Perangkat"}
+                    </button>
+                    
+                    <div className="flex gap-2 justify-center sm:justify-start">
+                       {['Felix', 'Aneka', 'Oliver', 'Mimi', 'Jasper', 'Midnight'].map(seed => (
+                          <button
+                            type="button"
+                            key={seed}
+                            onClick={() => setEditForm({...editForm, avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`})}
+                            className={`w-8 h-8 rounded-full bg-secondary overflow-hidden hover:scale-110 transition-transform ${editForm.avatar_url.includes(seed) ? 'ring-2 ring-primary ring-offset-2 ring-offset-card' : ''}`}
+                            title={`Avatar ${seed}`}
+                          >
+                             <img src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`} alt={seed} />
+                          </button>
+                       ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 

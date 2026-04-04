@@ -23,7 +23,6 @@ const navItems = [
   { href: "/pdf-workspace", label: "PDF Workspace", icon: FileText },
   { href: "/study-drive", label: "Study Drive", icon: HardDrive },
   { href: "/tips-strategi", label: "Tips & Strategi", icon: Lightbulb },
-  { href: "/score-check", label: "Cek Peluang PTN", icon: GraduationCap },
 ];
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {

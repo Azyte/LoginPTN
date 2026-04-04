@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { ClipboardList, Clock, BookOpen, Users, ArrowRight, Play, Trophy, BarChart3, CheckCircle2, Eye } from "lucide-react";
+import { ClipboardList, Clock, BookOpen, Users, ArrowRight, Play, CheckCircle2, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/providers/auth-provider";
 
 export default function TryoutPage() {
-  const { profile, user } = useAuth();
+  const { user } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const [tab, setTab] = useState<"available" | "history">("available");
   

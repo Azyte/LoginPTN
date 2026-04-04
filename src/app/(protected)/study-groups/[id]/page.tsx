@@ -24,6 +24,7 @@ export default function StudyGroupRoom() {
   const {
     localStream,
     remoteStreams,
+    onlineUsers,
     isMuted,
     isVoiceConnected,
     toggleMute,
@@ -194,21 +195,29 @@ export default function StudyGroupRoom() {
                 </div>
 
                 {/* Remote Participants */}
-                {Object.entries(remoteStreams).map(([peerId, data]) => (
-                  <div key={peerId} className="bg-secondary/30 rounded-xl p-4 flex items-center gap-3">
-                     <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground overflow-hidden">
-                       <Users className="w-5 h-5 text-muted-foreground"/>
-                     </div>
-                     <div className="flex-1">
-                       <div className="font-bold text-sm">{data.name}</div>
-                       <div className="text-xs text-green-500">Connected</div>
-                     </div>
-                     {/* Hidden Audio Element strictly for voice! */}
-                     <AudioPlayer stream={data.stream} /> 
-                  </div>
-                ))}
+                {Object.entries(onlineUsers).map(([peerId, data]) => {
+                  const hasStream = remoteStreams[peerId]?.stream;
+                  return (
+                    <div key={peerId} className="bg-secondary/30 rounded-xl p-4 flex items-center gap-3">
+                       <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground overflow-hidden relative">
+                         <Users className="w-5 h-5 text-muted-foreground"/>
+                         {!data.isMuted && hasStream && (
+                           <span className="absolute -right-1 -bottom-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background animate-pulse" title="Microphone Active"/>
+                         )}
+                       </div>
+                       <div className="flex-1 min-w-0">
+                         <div className="font-bold text-sm truncate">{data.name}</div>
+                         <div className={`text-xs ${hasStream ? "text-green-500" : "text-muted-foreground"}`}>
+                           {data.isMuted ? "Muted" : hasStream ? "Connected" : "Menghubungkan..."}
+                         </div>
+                       </div>
+                       {/* Hidden Audio Element strictly for voice! */}
+                       {hasStream && <AudioPlayer stream={remoteStreams[peerId].stream} />}
+                    </div>
+                  );
+                })}
 
-                {Object.keys(remoteStreams).length === 0 && (
+                {Object.keys(onlineUsers).length === 0 && (
                    <div className="text-center py-6 text-muted-foreground text-sm border-2 border-dashed border-border/50 rounded-xl">
                       Menunggu anggota lain bergabung...
                    </div>

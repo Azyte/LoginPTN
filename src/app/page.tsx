@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import {
   BookOpen, Brain, BarChart3, Users, Bot, GraduationCap,
   ArrowRight, Sparkles, Target, Trophy, Zap, ChevronRight,
-  Star, FileText, Clock, CheckCircle2, TrendingUp
+  Star, CheckCircle2, TrendingUp
 } from "lucide-react";
 
 function AnimatedCounter({ end, duration = 2000, suffix = "" }: { end: number; duration?: number; suffix?: string }) {
@@ -58,12 +58,6 @@ const features = [
     description: "Belajar bareng teman! Buat grup, diskusi real-time, dan motivasi satu sama lain.",
     gradient: "from-emerald-500 to-teal-500",
   },
-  {
-    icon: GraduationCap,
-    title: "Cek Peluang PTN",
-    description: "Kalkulasi peluang diterima PTN impianmu berdasarkan skor UTBK dan data historis.",
-    gradient: "from-blue-500 to-cyan-500",
-  },
 ];
 
 const stats = [
@@ -100,6 +94,7 @@ const testimonials = [
 export default function LandingPage() {
   const [isVisible, setIsVisible] = useState(false);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setIsVisible(true);
   }, []);
@@ -375,7 +370,6 @@ export default function LandingPage() {
               <div className="space-y-2 text-sm text-muted-foreground">
                 <div>Tips & Strategi</div>
                 <div>Study Groups</div>
-                <div>Cek Peluang PTN</div>
                 <div>PDF Workspace</div>
               </div>
             </div>

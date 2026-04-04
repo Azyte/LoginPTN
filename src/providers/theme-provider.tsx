@@ -20,27 +20,28 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark");
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
+  return (localStorage.getItem("loginptn-theme") as Theme | null) ?? "dark";
+}
 
-  useEffect(() => {
-    const stored = localStorage.getItem("loginptn-theme") as Theme | null;
-    if (stored) {
-      setThemeState(stored);
-    }
-  }, []);
+function resolveTheme(theme: Theme): "light" | "dark" {
+  if (theme === "system") {
+    if (typeof window === "undefined") return "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  return theme;
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => resolveTheme(getInitialTheme()));
 
   useEffect(() => {
     const root = document.documentElement;
-    let resolved: "light" | "dark" = "dark";
+    const resolved = resolveTheme(theme);
 
-    if (theme === "system") {
-      resolved = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    } else {
-      resolved = theme;
-    }
-
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setResolvedTheme(resolved);
     root.classList.remove("light", "dark");
     root.classList.add(resolved);

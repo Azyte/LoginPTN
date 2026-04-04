@@ -1,22 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { SupabaseClient } from "@supabase/supabase-js";
-
-interface Peer {
-  connection: RTCPeerConnection;
-  stream?: MediaStream;
-}
+import { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
 
 export function useWebRTC(roomId: string, userId: string, userName: string, supabase: SupabaseClient) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, { stream: MediaStream, name: string }>>({});
+  const [onlineUsers, setOnlineUsers] = useState<Record<string, { name: string, isMuted: boolean }>>({});
   const [isMuted, setIsMuted] = useState(false);
   const [isVoiceConnected, setIsVoiceConnected] = useState(false);
-  const [activeSpeakers, setActiveSpeakers] = useState<Set<string>>(new Set());
 
   const peersRef = useRef<Record<string, RTCPeerConnection>>({});
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   // Core configuration for WebRTC
   const rtcConfig = {
@@ -35,10 +30,14 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
       localStreamRef.current.getTracks().forEach(t => t.stop());
     }
     if (channelRef.current) {
+      try {
+        channelRef.current.untrack();
+      } catch { /* ignore untrack errors */ }
       channelRef.current.unsubscribe();
     }
     setLocalStream(null);
     setRemoteStreams({});
+    setOnlineUsers({});
     setIsVoiceConnected(false);
   }, []);
 
@@ -46,12 +45,20 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
     return () => cleanup();
   }, [cleanup]);
 
-  const toggleMute = () => {
+  const toggleMute = async () => {
     if (localStream) {
       localStream.getAudioTracks().forEach(track => {
         track.enabled = !track.enabled;
       });
-      setIsMuted(!localStream.getAudioTracks()[0].enabled);
+      const newMuted = !localStream.getAudioTracks()[0].enabled;
+      setIsMuted(newMuted);
+      
+      // Update presence state across all users instantly
+      if (channelRef.current) {
+        try {
+          await channelRef.current.track({ name: userName, isMuted: newMuted });
+        } catch { /* ignore presence errors */ }
+      }
     }
   };
 
@@ -103,20 +110,35 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
       localStreamRef.current = stream;
       setIsVoiceConnected(true);
 
-      // 2. Setup Supabase Realtime Channel as Signaling Server
+      // 2. Setup Supabase Realtime Channel (Signaling + Presence)
       const channel = supabase.channel(`voice-${roomId}`, {
-        config: { broadcast: { ack: false, self: false } }
+        config: { 
+          broadcast: { ack: false, self: false },
+          presence: { key: userId }
+        }
       });
       channelRef.current = channel;
 
+      // Listen for Presence Sync (Who is connected right now?)
+      channel.on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const users: Record<string, { name: string, isMuted: boolean }> = {};
+        for (const [id, presences] of Object.entries(state)) {
+          // Exclude self from the remote user view
+          if (id !== userId && presences.length > 0) {
+             users[id] = (presences[0] as unknown) as { name: string, isMuted: boolean };
+          }
+        }
+        setOnlineUsers(users);
+      });
+
+      // Listen for WebRTC Signaling
       channel.on('broadcast', { event: 'webrtc_signal' }, async ({ payload }) => {
-        // Only process signals meant for me or broadcasted to everyone (like 'hello')
         if (payload.target && payload.target !== userId) return;
 
         const { sender, senderName, signal } = payload;
 
         if (signal.type === "hello") {
-          // New person joined, they said hello. I should create an offer and send to them.
           const peer = createPeerConnection(sender, senderName);
           const offer = await peer.createOffer();
           await peer.setLocalDescription(offer);
@@ -127,7 +149,6 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
           });
         } 
         else if (signal.type === "offer") {
-          // Received an offer, create an answer
           const peer = createPeerConnection(sender, senderName);
           await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
           const answer = await peer.createAnswer();
@@ -139,21 +160,18 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
           });
         }
         else if (signal.type === "answer") {
-          // Received an answer to my offer
           const peer = peersRef.current[sender];
           if (peer) {
             await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
           }
         }
         else if (signal.type === "ice") {
-          // Received ICE candidate
           const peer = peersRef.current[sender];
           if (peer) {
             await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
           }
         }
         else if (signal.type === "leave") {
-          // A user left the voice chat
           if (peersRef.current[sender]) {
             peersRef.current[sender].close();
             delete peersRef.current[sender];
@@ -167,8 +185,12 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
       });
 
       // Join the channel and announce presence
-      channel.subscribe((status: string) => {
+      channel.subscribe(async (status: string) => {
         if (status === "SUBSCRIBED") {
+          // Add ourselves to the presence tracker
+          await channel.track({ name: userName, isMuted: false });
+
+          // Send hello to trigger WebRTC SDP negotiation
           channel.send({
             type: "broadcast",
             event: "webrtc_signal",
@@ -184,7 +206,6 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
   };
 
   const leaveVoiceChannel = () => {
-    // Notify others
     if (channelRef.current) {
       channelRef.current.send({
         type: "broadcast",
@@ -198,6 +219,7 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
   return {
     localStream,
     remoteStreams,
+    onlineUsers,
     isMuted,
     isVoiceConnected,
     toggleMute,

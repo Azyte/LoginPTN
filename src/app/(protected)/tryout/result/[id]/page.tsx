@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { SUBJECTS } from "@/lib/constants";
-import { Trophy, Target, Clock, TrendingUp, ArrowLeft, Download } from "lucide-react";
+import { Trophy, Target, TrendingUp, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import confetti from "canvas-confetti";
 

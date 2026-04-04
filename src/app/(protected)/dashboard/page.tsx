@@ -6,7 +6,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import {
   BookOpen, ClipboardList, Target, TrendingUp, Flame, Trophy,
-  ArrowRight, Brain, Zap, Calendar, CheckCircle2, Clock, Loader2
+  ArrowRight, Brain, Zap, Calendar, CheckCircle2, Clock, Loader2, Users
 } from "lucide-react";
 import { getStreakEmoji } from "@/lib/utils";
 
@@ -127,7 +127,7 @@ export default function DashboardPage() {
     { label: "Latihan Soal", href: "/bank-soal", icon: BookOpen, color: "from-indigo-500 to-purple-500" },
     { label: "Mulai Tryout", href: "/tryout", icon: ClipboardList, color: "from-purple-500 to-pink-500" },
     { label: "AI Assistant", href: "/ai-assistant", icon: Brain, color: "from-pink-500 to-rose-500" },
-    { label: "Cek Peluang", href: "/score-check", icon: Target, color: "from-emerald-500 to-teal-500" },
+    { label: "Study Groups", href: "/study-groups", icon: Users, color: "from-emerald-500 to-teal-500" },
   ];
 
   const greeting = () => {

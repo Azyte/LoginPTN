@@ -16,6 +16,7 @@ export function PomodoroWidget() {
         setTimeLeft((time) => time - 1);
       }, 1000);
     } else if (isActive && timeLeft === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsActive(false);
       // Mainkan suara pendek (jika ada) saat timer habis
       const newIsBreak = !isBreak;
