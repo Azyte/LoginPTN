@@ -172,10 +172,10 @@ export default function StudyGroupRoom() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-6">
+    <div className="max-w-[1400px] mx-auto min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-6">
       
       {/* LEFT PANEL: Voice Channel */}
-      <div className="lg:w-1/3 flex flex-col bg-card rounded-2xl border border-border/50 overflow-hidden shadow-sm">
+      <div className="lg:w-1/3 min-h-[400px] lg:min-h-0 flex flex-col bg-card rounded-2xl border border-border/50 overflow-hidden shadow-sm flex-shrink-0">
         <div className="p-5 border-b border-border/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => router.push('/study-groups')} className="p-2 hover:bg-secondary rounded-lg transition-colors">
@@ -273,7 +273,7 @@ export default function StudyGroupRoom() {
       </div>
 
       {/* RIGHT PANEL: Text Chat */}
-      <div className="flex-1 flex flex-col bg-card rounded-2xl border border-border/50 overflow-hidden shadow-sm">
+      <div className="flex-1 min-h-[500px] lg:min-h-0 flex flex-col bg-card rounded-2xl border border-border/50 overflow-hidden shadow-sm">
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div className="text-center mb-8 pt-4">
             <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-3">

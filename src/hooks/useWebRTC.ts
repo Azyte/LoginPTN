@@ -42,8 +42,87 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
   }, []);
 
   useEffect(() => {
+    // 1. Setup Supabase Realtime Channel Immediately for Presence 
+    const channel = supabase.channel(`voice-${roomId}`, {
+      config: { 
+        broadcast: { ack: false, self: false },
+        presence: { key: userId }
+      }
+    });
+    channelRef.current = channel;
+
+    // Listen for Presence Sync 
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const users: Record<string, { name: string, isMuted: boolean }> = {};
+      for (const [id, presences] of Object.entries(state)) {
+        if (id !== userId && presences.length > 0) {
+           users[id] = (presences[0] as unknown) as { name: string, isMuted: boolean };
+        }
+      }
+      setOnlineUsers(users);
+    });
+
+    // Listen for WebRTC Signaling
+    channel.on('broadcast', { event: 'webrtc_signal' }, async ({ payload }) => {
+      if (payload.target && payload.target !== userId) return;
+
+      const { sender, senderName, signal } = payload;
+
+      if (signal.type === "hello") {
+        const peer = createPeerConnection(sender, senderName);
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        
+        channel.send({
+          type: "broadcast", event: "webrtc_signal",
+          payload: { target: sender, sender: userId, senderName: userName, signal: { type: "offer", description: peer.localDescription } }
+        });
+      } 
+      else if (signal.type === "offer") {
+        const peer = createPeerConnection(sender, senderName);
+        await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+
+        channel.send({
+          type: "broadcast", event: "webrtc_signal",
+          payload: { target: sender, sender: userId, senderName: userName, signal: { type: "answer", description: peer.localDescription } }
+        });
+      }
+      else if (signal.type === "answer") {
+        const peer = peersRef.current[sender];
+        if (peer) {
+          await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
+        }
+      }
+      else if (signal.type === "ice") {
+        const peer = peersRef.current[sender];
+        if (peer && peer.remoteDescription) {
+          peer.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(e => console.error("ICE error", e));
+        } else {
+          if (!pendingCandidates.current[sender]) pendingCandidates.current[sender] = [];
+          pendingCandidates.current[sender].push(signal.candidate);
+        }
+      }
+      else if (signal.type === "leave") {
+        if (peersRef.current[sender]) {
+          peersRef.current[sender].close();
+          delete peersRef.current[sender];
+        }
+        setRemoteStreams(prev => {
+          const next = { ...prev };
+          delete next[sender];
+          return next;
+        });
+      }
+    });
+
+    channel.subscribe();
+
     return () => cleanup();
-  }, [cleanup]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, userId, userName, cleanup]);
 
   const toggleMute = async () => {
     if (localStream) {
@@ -62,13 +141,18 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
     }
   };
 
+  const pendingCandidates = useRef<Record<string, RTCIceCandidateInit[]>>({});
+
   const createPeerConnection = (targetUserId: string, targetName: string) => {
+    if (peersRef.current[targetUserId]) {
+       return peersRef.current[targetUserId];
+    }
     const peer = new RTCPeerConnection(rtcConfig);
 
     // Add local stream tracks to peer
-    if (localStream) {
-      localStream.getTracks().forEach(track => {
-        peer.addTrack(track, localStream);
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        peer.addTrack(track, localStreamRef.current!);
       });
     }
 
@@ -90,15 +174,25 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
 
     // Handle incoming media streams
     peer.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        setRemoteStreams(prev => ({
-          ...prev,
-          [targetUserId]: { stream: event.streams[0], name: targetName }
-        }));
+      let stream = event.streams[0];
+      if (!stream) {
+        stream = new MediaStream();
+        stream.addTrack(event.track);
       }
+      setRemoteStreams(prev => ({
+        ...prev,
+        [targetUserId]: { stream, name: targetName }
+      }));
     };
 
     peersRef.current[targetUserId] = peer;
+    
+    // Process any queued candidates
+    if (pendingCandidates.current[targetUserId]) {
+      pendingCandidates.current[targetUserId].forEach(c => peer.addIceCandidate(new RTCIceCandidate(c)));
+      delete pendingCandidates.current[targetUserId];
+    }
+
     return peer;
   };
 
@@ -110,95 +204,17 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
       localStreamRef.current = stream;
       setIsVoiceConnected(true);
 
-      // 2. Setup Supabase Realtime Channel (Signaling + Presence)
-      const channel = supabase.channel(`voice-${roomId}`, {
-        config: { 
-          broadcast: { ack: false, self: false },
-          presence: { key: userId }
-        }
-      });
-      channelRef.current = channel;
+      if (channelRef.current) {
+        // Add ourselves to the presence tracker
+        await channelRef.current.track({ name: userName, isMuted: false });
 
-      // Listen for Presence Sync (Who is connected right now?)
-      channel.on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const users: Record<string, { name: string, isMuted: boolean }> = {};
-        for (const [id, presences] of Object.entries(state)) {
-          // Exclude self from the remote user view
-          if (id !== userId && presences.length > 0) {
-             users[id] = (presences[0] as unknown) as { name: string, isMuted: boolean };
-          }
-        }
-        setOnlineUsers(users);
-      });
-
-      // Listen for WebRTC Signaling
-      channel.on('broadcast', { event: 'webrtc_signal' }, async ({ payload }) => {
-        if (payload.target && payload.target !== userId) return;
-
-        const { sender, senderName, signal } = payload;
-
-        if (signal.type === "hello") {
-          const peer = createPeerConnection(sender, senderName);
-          const offer = await peer.createOffer();
-          await peer.setLocalDescription(offer);
-          
-          channel.send({
-            type: "broadcast", event: "webrtc_signal",
-            payload: { target: sender, sender: userId, senderName: userName, signal: { type: "offer", description: peer.localDescription } }
-          });
-        } 
-        else if (signal.type === "offer") {
-          const peer = createPeerConnection(sender, senderName);
-          await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
-          const answer = await peer.createAnswer();
-          await peer.setLocalDescription(answer);
-
-          channel.send({
-            type: "broadcast", event: "webrtc_signal",
-            payload: { target: sender, sender: userId, senderName: userName, signal: { type: "answer", description: peer.localDescription } }
-          });
-        }
-        else if (signal.type === "answer") {
-          const peer = peersRef.current[sender];
-          if (peer) {
-            await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
-          }
-        }
-        else if (signal.type === "ice") {
-          const peer = peersRef.current[sender];
-          if (peer) {
-            await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
-          }
-        }
-        else if (signal.type === "leave") {
-          if (peersRef.current[sender]) {
-            peersRef.current[sender].close();
-            delete peersRef.current[sender];
-          }
-          setRemoteStreams(prev => {
-            const next = { ...prev };
-            delete next[sender];
-            return next;
-          });
-        }
-      });
-
-      // Join the channel and announce presence
-      channel.subscribe(async (status: string) => {
-        if (status === "SUBSCRIBED") {
-          // Add ourselves to the presence tracker
-          await channel.track({ name: userName, isMuted: false });
-
-          // Send hello to trigger WebRTC SDP negotiation
-          channel.send({
-            type: "broadcast",
-            event: "webrtc_signal",
-            payload: { sender: userId, senderName: userName, signal: { type: "hello" } }
-          });
-        }
-      });
-      
+        // Send hello to trigger WebRTC SDP negotiation
+        channelRef.current.send({
+          type: "broadcast",
+          event: "webrtc_signal",
+          payload: { sender: userId, senderName: userName, signal: { type: "hello" } }
+        });
+      }
     } catch (err) {
       console.error("Gagal mengakses mikrofon:", err);
       alert("Harap izinkan akses Mikrofon di browser untuk bergabung ke Voice Chat.");
