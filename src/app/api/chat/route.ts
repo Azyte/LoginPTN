@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 
-export const dynamic = 'force-dynamic'; // Hindari masalah static build
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  // Pindahkan require ke dalam scope fungsi agar tidak dieksekusi saat proses "next build" (Build Time)
-  const pdfParse = require("pdf-parse");
   try {
     const { messages, userMessage, fileUrl } = await request.json();
 
@@ -18,16 +16,19 @@ export async function POST(request: Request) {
     let extractedText = "";
     if (fileUrl) {
       try {
+        // Only require pdf-parse when we actually need it (lazy load)
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pdfParse = require("pdf-parse");
         const fileResponse = await fetch(fileUrl);
         if (fileResponse.ok) {
           const arrayBuffer = await fileResponse.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
           const pdfData = await pdfParse(buffer);
-          // Limit to roughly 15000 characters to prevent overflowing Groq Llama-3 context limit safely
           extractedText = pdfData.text.slice(0, 15000);
         }
       } catch (err) {
         console.error("Failed to parse PDF:", err);
+        // Continue without PDF text — don't crash the entire request
       }
     }
 
@@ -38,10 +39,10 @@ Tugas utamamu adalah:
 3. **Ahli Membuat Soal**: Jika diminta membuat soal (dari materi, pdf, atau acak), buatlah soal standar UTBK SNBT tipe terbaru (Penalaran Umum, Pengetahuan Kuantitatif, Literasi). Format soal dengan jelas: Pertanyaan, Pilihan Ganda (A-E), Kunci Jawaban dengan indikator emoji (✅), dan Pembahasan detail.
 4. **Strategi Belajar**: Jika ditanya, sarankan strategi seperti Pomodoro, Active Recall, dan Spaced Repetition dengan cara yang praktis.
 5. Gunakan formatting Markdown kaya fitur: Heading (##), List (-), Blockquote (>), dan tabel bila data perlu dibandingkan. Selalu akhiri pesan dengan kalimat penyemangat! 🔥
-${extractedText ? `\n\n**REFERENSI DOKUMEN PDF (Maksimal ekstrak awal)**:\n"""\n${extractedText}\n"""\nGunakan referensi di atas dengan teliti untuk menjawab permintaan user.` : ""}`
+${extractedText ? `\n\n**REFERENSI DOKUMEN PDF (Maksimal ekstrak awal)**:\n"""\n${extractedText}\n"""\nGunakan referensi di atas dengan teliti untuk menjawab permintaan user.` : ""}`;
 
     const payload = {
-      model: "llama-3.3-70b-versatile", // Sesuai dengan Groq Llama-3
+      model: "llama-3.3-70b-versatile",
       messages: [
         {
           role: "system",
@@ -63,6 +64,7 @@ ${extractedText ? `\n\n**REFERENSI DOKUMEN PDF (Maksimal ekstrak awal)**:\n"""\n
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("Groq API Error:", response.status, errorText);
       return NextResponse.json({ error: `Groq/AI Error: ${errorText}` }, { status: response.status });
     }
 
@@ -70,6 +72,6 @@ ${extractedText ? `\n\n**REFERENSI DOKUMEN PDF (Maksimal ekstrak awal)**:\n"""\n
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("Internal API /chat Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }
