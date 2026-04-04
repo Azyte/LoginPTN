@@ -200,20 +200,22 @@ export default function StudyGroupRoom() {
         </div>
 
         <div className="flex-1 p-5 overflow-y-auto space-y-4 relative">
-          {!isVoiceConnected ? (
-             <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm z-10 flex-col p-6 text-center">
-                <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
-                  <Phone className="w-8 h-8" />
+          {!isVoiceConnected && (
+             <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex flex-col items-center justify-center text-center mb-4">
+                <div className="w-12 h-12 bg-primary/20 text-primary rounded-full flex items-center justify-center mb-3">
+                  <Phone className="w-6 h-6" />
                 </div>
-                <h3 className="font-bold text-lg mb-2">Voice Channel Offline</h3>
-                <p className="text-sm text-muted-foreground mb-6">Bergabung dengan channel suara untuk berdiskusi langsung dengan anggota grup ini.</p>
-                <button onClick={joinVoiceChannel} className="bg-primary hover:opacity-90 text-primary-foreground font-bold py-3 px-6 rounded-xl flex items-center gap-2 shadow-lg shadow-primary/25 transition-all">
-                  <Phone className="w-5 h-5" /> Hubungkan Suara
+                <h3 className="font-bold text-sm mb-1">Voice Channel Offline</h3>
+                <p className="text-xs text-muted-foreground mb-4">Bergabung untuk berbicara dengan anggota yang sudah di dalam.</p>
+                <button onClick={joinVoiceChannel} className="w-full bg-primary hover:opacity-90 text-primary-foreground font-bold py-2.5 px-4 rounded-xl flex justify-center items-center gap-2 transition-all">
+                  <Phone className="w-4 h-4" /> Hubungkan Suara
                 </button>
              </div>
-          ) : (
-             <div className="flex flex-col gap-3">
-                {/* Me */}
+          )}
+
+          <div className="flex flex-col gap-3">
+             {/* Me */}
+             {isVoiceConnected && (
                 <div className="bg-secondary/50 rounded-xl p-4 flex items-center justify-between border border-primary/20">
                    <div className="flex items-center gap-3">
                      <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary/50 flex items-center justify-center text-primary relative">
@@ -226,37 +228,37 @@ export default function StudyGroupRoom() {
                      </div>
                    </div>
                 </div>
+             )}
 
-                {/* Remote Participants */}
-                {Object.entries(onlineUsers).map(([peerId, data]) => {
-                  const hasStream = remoteStreams[peerId]?.stream;
-                  return (
-                    <div key={peerId} className="bg-secondary/30 rounded-xl p-4 flex items-center gap-3">
-                       <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground overflow-hidden relative">
-                         <Users className="w-5 h-5 text-muted-foreground"/>
-                         {!data.isMuted && hasStream && (
-                           <span className="absolute -right-1 -bottom-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background animate-pulse" title="Microphone Active"/>
-                         )}
-                       </div>
-                       <div className="flex-1 min-w-0">
-                         <div className="font-bold text-sm truncate">{data.name}</div>
-                         <div className={`text-xs ${hasStream ? "text-green-500" : "text-muted-foreground"}`}>
-                           {data.isMuted ? "Muted" : hasStream ? "Connected" : "Menghubungkan..."}
-                         </div>
-                       </div>
-                       {/* Hidden Audio Element strictly for voice! */}
-                       {hasStream && <AudioPlayer stream={remoteStreams[peerId].stream} />}
+             {/* Remote Participants */}
+             {Object.entries(onlineUsers).map(([peerId, data]) => {
+               const hasStream = remoteStreams[peerId]?.stream;
+               return (
+                 <div key={peerId} className="bg-secondary/30 rounded-xl p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground overflow-hidden relative">
+                      <Users className="w-5 h-5 text-muted-foreground"/>
+                      {!data.isMuted && hasStream && (
+                        <span className="absolute -right-1 -bottom-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background animate-pulse" title="Microphone Active"/>
+                      )}
                     </div>
-                  );
-                })}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-sm truncate">{data.name}</div>
+                      <div className={`text-xs ${hasStream ? "text-green-500" : "text-muted-foreground"}`}>
+                        {data.isMuted ? "Muted" : hasStream ? "Connected" : isVoiceConnected ? "Menghubungkan..." : "Di dalam ruangan"}
+                      </div>
+                    </div>
+                    {/* Hidden Audio Element strictly for voice! */}
+                    {hasStream && <AudioPlayer stream={remoteStreams[peerId].stream} />}
+                 </div>
+               );
+             })}
 
-                {Object.keys(onlineUsers).length === 0 && (
-                   <div className="text-center py-6 text-muted-foreground text-sm border-2 border-dashed border-border/50 rounded-xl">
-                      Menunggu anggota lain bergabung...
-                   </div>
-                )}
-             </div>
-          )}
+             {Object.keys(onlineUsers).length === 0 && !isVoiceConnected && (
+                <div className="text-center py-6 text-muted-foreground text-sm border-2 border-dashed border-border/50 rounded-xl opacity-70">
+                   Belum ada anggota yang bergabung di Voice Channel.
+                </div>
+             )}
+          </div>
         </div>
 
         {isVoiceConnected && (
