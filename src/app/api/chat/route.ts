@@ -42,7 +42,8 @@ Tugas utamamu adalah:
 ${extractedText ? `\n\n**REFERENSI DOKUMEN PDF (Maksimal ekstrak awal)**:\n"""\n${extractedText}\n"""\nGunakan referensi di atas dengan teliti untuk menjawab permintaan user.` : ""}`;
 
     const payload = {
-      model: "llama-3.3-70b-versatile",
+      model: "llama-3.1-8b-instant",
+      max_tokens: 2048,
       messages: [
         {
           role: "system",

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, Suspense } from "react";
 import { Bot, Send, Plus, MessageSquare, Loader2, Sparkles, Trash2, ArrowLeft, Download } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { sendAIMessage } from "@/lib/ai/agent";
 import type { AIMessage } from "@/lib/types";
 import { useAuth } from "@/providers/auth-provider";
@@ -114,6 +115,12 @@ function AIAssistantContent() {
     setInput("");
     setLoading(true);
 
+    // Optimistically show user message IMMEDIATELY (before DB save)
+    const optimisticUserMsg: AIMessage = { id: "opt-" + Date.now(), role: "user", content: msgText, conversation_id: currentConvId, created_at: new Date().toISOString() };
+    setConversations(prev => prev.map(c => 
+      c.id === currentConvId ? { ...c, messages: [...c.messages, optimisticUserMsg] } : c
+    ));
+
     let isNewConv = false;
     let convTitle = "Percakapan Baru";
 
@@ -130,22 +137,15 @@ function AIAssistantContent() {
         const oldId = currentConvId;
         currentConvId = newDbConv.id;
         setActiveConvId(newDbConv.id);
-        // Replace temp ID di state
         setConversations(prev => prev.map(c => 
-          c.id === oldId ? { ...c, id: newDbConv.id, title: convTitle } : c
+          c.id === oldId ? { ...c, id: newDbConv.id, title: convTitle, messages: c.messages.map(m => ({ ...m, conversation_id: newDbConv.id })) } : c
         ));
       }
     }
 
-    // Insert pesan user
+    // Save user message to DB in background
     const userMsg = { role: "user", content: msgText, conversation_id: currentConvId };
-    const { data: savedUserMsg } = await supabase.from('ai_messages').insert(userMsg).select().single();
-    
-    if (savedUserMsg) {
-      setConversations(prev => prev.map(c => 
-        c.id === currentConvId ? { ...c, messages: [...c.messages, savedUserMsg] } : c
-      ));
-    }
+    supabase.from('ai_messages').insert(userMsg).select().single();
 
     try {
       const activeMessages = conversations.find(c => c.id === currentConvId)?.messages || [];
@@ -265,10 +265,14 @@ function AIAssistantContent() {
           {activeConv?.messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className="flex flex-col gap-1 items-start max-w-[85%]">
-                <div className={`px-5 py-3 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${
-                  msg.role === "user" ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm self-end" : "bg-secondary text-foreground rounded-2xl rounded-tl-sm self-start"
+                <div className={`px-5 py-3 text-sm leading-relaxed shadow-sm ${
+                  msg.role === "user" ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm self-end whitespace-pre-wrap" : "bg-secondary text-foreground rounded-2xl rounded-tl-sm self-start prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-headings:my-2 prose-li:my-0.5 prose-blockquote:my-2"
                 }`}>
-                  {msg.content}
+                  {msg.role === "assistant" ? (
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
                 {msg.role === "assistant" && (
                   <button 
