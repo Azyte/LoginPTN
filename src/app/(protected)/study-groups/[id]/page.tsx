@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { useWebRTC } from "@/hooks/useWebRTC";
-import { Phone, PhoneOff, Mic, MicOff, Send, Users, ArrowLeft, Loader2, MessageCircle, Paperclip, FileText, Download } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Send, Users, ArrowLeft, Loader2, MessageCircle, Paperclip, FileText, Download, Trash2, ShieldAlert } from "lucide-react";
 
 export default function StudyGroupRoom() {
   const { id } = useParams();
@@ -18,6 +18,8 @@ export default function StudyGroupRoom() {
   const [msgInput, setMsgInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
+  const [showMembers, setShowMembers] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -55,6 +57,15 @@ export default function StudyGroupRoom() {
         .limit(100);
         
       if (m) setMessages(m);
+
+      // Get Members
+      const { data: mem } = await supabase
+        .from("group_members")
+        .select("role, joined_at, profiles:user_id(id, name, avatar_url, target_university_id)")
+        .eq("group_id", id);
+      
+      if (mem) setMembers(mem);
+
       setLoading(false);
     };
 
@@ -84,6 +95,20 @@ export default function StudyGroupRoom() {
       chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  const handleDeleteGroup = async () => {
+    if (!group || group.owner_id !== user?.id) return;
+    if (confirm("Apakah Anda yakin ingin menghapus grup ini? Semua pesan, file, dan anggota akan dihapus permanen.")) {
+      setLoading(true);
+      const { error } = await supabase.from("study_groups").delete().eq("id", id);
+      if (error) {
+        alert("Gagal menghapus grup: " + error.message);
+        setLoading(false);
+      } else {
+        router.push("/study-groups");
+      }
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,10 +184,18 @@ export default function StudyGroupRoom() {
             <div>
               <h1 className="font-bold text-lg line-clamp-1 leading-tight">{group?.name}</h1>
               <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider relative pl-3">
-                <span className="absolute left-0 top-1.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                Live Channel
               </span>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowMembers(true)} className="p-2 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground" title="Daftar Anggota">
+              <Users className="w-5 h-5" />
+            </button>
+            {group?.owner_id === user?.id && (
+              <button onClick={handleDeleteGroup} className="p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-colors" title="Hapus Grup">
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -325,6 +358,54 @@ export default function StudyGroupRoom() {
           </div>
         </form>
       </div>
+
+      {/* MEMBERS MODAL */}
+      {showMembers && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-card border border-border mt-16 rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-5 border-b border-border/50 flex items-center justify-between">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" /> Anggota Grup ({members.length})
+              </h3>
+              <button onClick={() => setShowMembers(false)} className="text-muted-foreground hover:text-foreground p-1">
+                <ArrowLeft className="w-5 h-5 rotate-180" />
+              </button>
+            </div>
+            <div className="p-2 max-h-[60vh] overflow-y-auto">
+              {members.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">Belum ada anggota yang dimuat.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {members.map((m, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 hover:bg-secondary/50 rounded-xl transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary overflow-hidden">
+                        {m.profiles?.avatar_url ? (
+                          <img src={m.profiles.avatar_url} className="w-full h-full object-cover" />
+                        ) : (
+                          <Users className="w-5 h-5" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-bold text-sm flex items-center gap-2">
+                          {m.profiles?.name || "Anonim"}
+                          {m.role === "owner" && (
+                            <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
+                              <ShieldAlert className="w-3 h-3" /> Admin
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Bergabung: {new Date(m.joined_at).toLocaleDateString("id-ID")}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
