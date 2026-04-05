@@ -18,7 +18,6 @@ export function PomodoroWidget() {
     } else if (isActive && timeLeft === 0) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsActive(false);
-      // Mainkan suara pendek (jika ada) saat timer habis
       const newIsBreak = !isBreak;
       setIsBreak(newIsBreak);
       setTimeLeft(newIsBreak ? 5 * 60 : 25 * 60);
@@ -52,16 +51,16 @@ export function PomodoroWidget() {
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 bg-primary text-primary-foreground p-4 rounded-full shadow-xl hover:scale-105 transition-transform z-50 flex items-center justify-center animate-bounce"
+        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 bg-primary text-primary-foreground p-3 sm:p-4 rounded-full shadow-xl hover:scale-105 transition-transform z-40 flex items-center justify-center"
         title="Buka Timer Belajar"
       >
-        <Target className="w-6 h-6" />
+        <Target className="w-5 h-5 sm:w-6 sm:h-6" />
       </button>
     );
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-72 bg-card border border-border/50 shadow-2xl rounded-2xl p-5 z-50 animate-in slide-in-from-bottom-5">
+    <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 w-64 sm:w-72 bg-card border border-border/50 shadow-2xl rounded-2xl p-4 sm:p-5 z-40">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold flex items-center gap-2 text-sm">
           <Clock className="w-4 h-4 text-primary" /> Focus Timer

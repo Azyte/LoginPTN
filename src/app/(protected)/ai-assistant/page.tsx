@@ -143,9 +143,9 @@ function AIAssistantContent() {
       }
     }
 
-    // Save user message to DB in background
+    // Save user message to DB (await to ensure persistence)
     const userMsg = { role: "user", content: msgText, conversation_id: currentConvId };
-    supabase.from('ai_messages').insert(userMsg).select().single();
+    await supabase.from('ai_messages').insert(userMsg).select().single();
 
     try {
       const activeMessages = conversations.find(c => c.id === currentConvId)?.messages || [];
