@@ -51,7 +51,7 @@ export function PomodoroWidget() {
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 bg-primary text-primary-foreground p-3 sm:p-4 rounded-full shadow-xl hover:scale-105 transition-transform z-40 flex items-center justify-center"
+        className="fixed top-20 right-4 sm:top-auto sm:bottom-6 sm:right-6 bg-primary text-primary-foreground p-3 sm:p-4 rounded-full shadow-xl hover:scale-105 transition-transform z-40 flex items-center justify-center opacity-80 hover:opacity-100"
         title="Buka Timer Belajar"
       >
         <Target className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -60,7 +60,7 @@ export function PomodoroWidget() {
   }
 
   return (
-    <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 w-64 sm:w-72 bg-card border border-border/50 shadow-2xl rounded-2xl p-4 sm:p-5 z-40">
+    <div className="fixed top-20 right-4 sm:top-auto sm:bottom-6 sm:right-6 w-64 sm:w-72 bg-card border border-border/50 shadow-2xl rounded-2xl p-4 sm:p-5 z-40 animate-in fade-in slide-in-from-top-4 sm:slide-in-from-bottom-4 duration-200">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold flex items-center gap-2 text-sm">
           <Clock className="w-4 h-4 text-primary" /> Focus Timer

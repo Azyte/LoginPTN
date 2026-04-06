@@ -123,14 +123,20 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Mobile Overlay */}
-      {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-[280px] h-full bg-card border-r border-border/50">
-            <SidebarContent />
-          </aside>
-        </div>
-      )}
+      <div 
+        className={`lg:hidden fixed inset-0 z-50 transition-opacity duration-300 ${
+          mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+        <aside 
+           className={`relative w-[280px] h-full bg-card border-r border-border/50 transition-transform duration-300 ease-in-out ${
+             mobileOpen ? "translate-x-0" : "-translate-x-full"
+           }`}
+        >
+          <SidebarContent />
+        </aside>
+      </div>
 
       {/* Main Content */}
       <div className={`flex-1 transition-all duration-300 ${sidebarOpen ? "lg:ml-[260px]" : "lg:ml-[72px]"}`}>
@@ -171,7 +177,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page Content */}
-        <main className="p-4 sm:p-6 lg:p-8">
+        <main className="p-3 sm:p-6 lg:p-8">
           {children}
         </main>
         
