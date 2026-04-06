@@ -8,7 +8,7 @@ import { useTheme } from "@/providers/theme-provider";
 import {
   LayoutDashboard, BookOpen, ClipboardList, BarChart3, Bot, Users,
   FileText, HardDrive, Lightbulb, GraduationCap, User, Settings,
-  LogOut, Menu, X, ChevronLeft, Moon, Sun, Bell
+  LogOut, Menu, X, ChevronLeft, Moon, Sun, Bell, Trophy
 } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { PomodoroWidget } from "@/components/ui/Pomodoro";
@@ -17,6 +17,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/bank-soal", label: "Bank Soal", icon: BookOpen },
   { href: "/tryout", label: "Tryout", icon: ClipboardList },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/analytics", label: "Analitik", icon: BarChart3 },
   { href: "/ai-assistant", label: "AI Assistant", icon: Bot },
   { href: "/study-groups", label: "Study Groups", icon: Users },

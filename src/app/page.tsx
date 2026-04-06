@@ -101,6 +101,46 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* JSON-LD Structured Data for Google Rich Results & Sitelinks */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "LoginPTN",
+            "alternateName": ["Login PTN", "LoginPTN UTBK", "LoginPTN SNBT"],
+            "url": "https://loginptn.xyz",
+            "description": "Platform belajar digital cerdas berbasis AI untuk persiapan UTBK SNBT. Bank soal lengkap, tryout realistis, AI assistant, analytics, dan komunitas belajar.",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": "https://loginptn.xyz/bank-soal?q={search_term_string}",
+              "query-input": "required name=search_term_string"
+            },
+            "publisher": {
+              "@type": "Organization",
+              "name": "LoginPTN",
+              "url": "https://loginptn.xyz",
+              "logo": "https://loginptn.xyz/favicon.ico"
+            }
+          })
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "EducationalOrganization",
+            "name": "LoginPTN",
+            "url": "https://loginptn.xyz",
+            "description": "Smart AI-Powered Digital Learning Platform untuk UTBK SNBT Indonesia",
+            "sameAs": ["https://github.com/Azyte/LoginPTN"],
+            "areaServed": { "@type": "Country", "name": "Indonesia" },
+            "teaches": ["UTBK", "SNBT", "Penalaran Umum", "Pengetahuan Kuantitatif", "Literasi Bahasa Indonesia", "Literasi Bahasa Inggris"]
+          })
+        }}
+      />
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
