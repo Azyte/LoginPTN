@@ -55,24 +55,44 @@ export default function BankSoalPage() {
         }
       } else {
         // Mode Folder Biasa: Ambil soal berdasarkan subtes saja
-        const { data } = await supabase
+        const questionsPromise = supabase
           .from('questions')
           .select('*, subjects!inner(code)')
           .eq('subjects.code', folderId)
           .order('created_at', { ascending: false });
+          
+        const dummyPromise = Promise.resolve({ data: null, error: null });
+
+        // AMBIL HISTORY HANYA JIKA BUKAN MODE ACAK
+        const answersPromise = user 
+          ? supabase
+              .from('user_answers')
+              .select('question_id, answer, is_correct, questions!inner(subject_id)')
+              .eq('user_id', user.id)
+          : dummyPromise;
+          
+        const bookmarksPromise = user
+          ? supabase
+              .from('bookmarks')
+              .select('question_id')
+              .eq('user_id', user.id)
+          : dummyPromise;
+
+        const [questionsRes, answersRes, bkmRes] = await Promise.all([
+          questionsPromise,
+          answersPromise,
+          bookmarksPromise
+        ]);
+
+        const data = questionsRes.data;
+        const prevAnswers = answersRes.data;
+        const bkmData = bkmRes.data;
 
         if (data) {
           fetchedQuestions = data;
         }
 
-        // AMBIL HISTORY HANYA JIKA BUKAN MODE ACAK
         if (user) {
-          // History jawaban
-          const { data: prevAnswers } = await supabase
-            .from('user_answers')
-            .select('question_id, answer, is_correct, questions!inner(subject_id)') // pastikan bisa ngambil subject jika perlu, tapi kita filter pakai JS dulu biar gampang
-            .eq('user_id', user.id);
-
           if (prevAnswers && prevAnswers.length > 0) {
             const restored: Record<string, { selected: string; revealed: boolean }> = {};
             const qIds = new Set(fetchedQuestions.map(q => q.id)); // ID soal di folder ini
@@ -94,17 +114,12 @@ export default function BankSoalPage() {
             setAnswers(restored);
           }
 
-          // Riwayat Bookmarks
-          const { data: bkmData } = await supabase
-            .from('bookmarks')
-            .select('question_id')
-            .eq('user_id', user.id);
-
           if (bkmData) {
             setBookmarks(new Set(bkmData.map((b: any) => b.question_id)));
           }
         }
       }
+
 
       // Format Data Soal
       const formatted = fetchedQuestions.map(q => {

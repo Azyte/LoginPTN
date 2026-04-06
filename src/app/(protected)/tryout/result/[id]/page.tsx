@@ -24,15 +24,29 @@ export default function TryoutResultPage() {
       if (!params.id) return;
 
       try {
-        // Fetch the attempt with tryout info
-        const { data: attemptData, error: attemptError } = await supabase
-          .from("tryout_attempts")
-          .select(`
-            *,
-            tryout:tryouts(title, description, duration_minutes)
-          `)
-          .eq("id", params.id as string)
-          .single();
+        // Parallelize fetching attempt details and answers
+        const [attemptResponse, answersResponse] = await Promise.all([
+          supabase
+            .from("tryout_attempts")
+            .select(`
+              *,
+              tryout:tryouts(title, description, duration_minutes)
+            `)
+            .eq("id", params.id as string)
+            .single(),
+            
+          supabase
+            .from("tryout_answers")
+            .select(`
+              *,
+              question:questions(id, content, options, correct_answer, subject_id, difficulty),
+              section:tryout_sections(id, order_index, subject_id, duration_minutes, subjects(name, code))
+            `)
+            .eq("attempt_id", params.id as string)
+        ]);
+
+        const { data: attemptData, error: attemptError } = attemptResponse;
+        const answersData = answersResponse.data;
 
         if (attemptError || !attemptData) {
           setError("Hasil tryout tidak ditemukan.");
@@ -41,16 +55,6 @@ export default function TryoutResultPage() {
         }
 
         setAttempt(attemptData);
-
-        // Fetch answers for this attempt with question + section info
-        const { data: answersData } = await supabase
-          .from("tryout_answers")
-          .select(`
-            *,
-            question:questions(id, content, options, correct_answer, subject_id, difficulty),
-            section:tryout_sections(id, order_index, subject_id, duration_minutes, subjects(name, code))
-          `)
-          .eq("attempt_id", params.id as string);
 
         if (answersData && answersData.length > 0) {
           // Group answers by section

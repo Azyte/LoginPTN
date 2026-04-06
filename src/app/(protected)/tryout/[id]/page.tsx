@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Flag, AlertTriangle, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -27,7 +27,7 @@ export default function TryoutTakePage() {
   const router = useRouter();
   const params = useParams();
   const { profile } = useAuth();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(true);
   const [tryout, setTryout] = useState<any>(null);

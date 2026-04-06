@@ -21,15 +21,30 @@ export default function TryoutPage() {
       if (!user) { setLoading(false); return; }
 
       try {
-        // Fetch active tryouts
-        const { data: activeTryouts } = await supabase
-          .from("tryouts")
-          .select(`
-            *,
-            attempts:tryout_attempts(count)
-          `)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false });
+        // Run both active tryouts and user history fetching in parallel
+        const [tryoutsResponse, historyResponse] = await Promise.all([
+          supabase
+            .from("tryouts")
+            .select(`
+              *,
+              attempts:tryout_attempts(count)
+            `)
+            .eq("is_active", true)
+            .order("created_at", { ascending: false }),
+            
+          supabase
+            .from("tryout_attempts")
+            .select(`
+              *,
+              tryout:tryouts(title)
+            `)
+            .eq("user_id", user.id)
+            .eq("status", "completed")
+            .order("finished_at", { ascending: false })
+        ]);
+
+        const activeTryouts = tryoutsResponse.data;
+        const pastAttempts = historyResponse.data;
 
         if (activeTryouts) {
           setTryouts(activeTryouts.map(t => ({
@@ -38,17 +53,6 @@ export default function TryoutPage() {
             difficulty: "Mixed"
           })));
         }
-
-        // Fetch history (completed attempts by this user)
-        const { data: pastAttempts } = await supabase
-          .from("tryout_attempts")
-          .select(`
-            *,
-            tryout:tryouts(title)
-          `)
-          .eq("user_id", user.id)
-          .eq("status", "completed")
-          .order("finished_at", { ascending: false });
 
         if (pastAttempts) {
           setHistory(pastAttempts);
