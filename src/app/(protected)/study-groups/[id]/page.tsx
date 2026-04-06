@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { useWebRTC } from "@/hooks/useWebRTC";
-import { Phone, PhoneOff, Mic, MicOff, Send, Users, ArrowLeft, Loader2, MessageCircle, Paperclip, FileText, Download, Trash2, ShieldAlert } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Send, Users, ArrowLeft, Loader2, MessageCircle, Paperclip, FileText, Download, Trash2, ShieldAlert, Gamepad2 } from "lucide-react";
+import { TriviaBattle } from "@/components/ui/TriviaBattle";
 
 export default function StudyGroupRoom() {
   const { id } = useParams();
@@ -20,6 +21,7 @@ export default function StudyGroupRoom() {
   const [uploading, setUploading] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
   const [showMembers, setShowMembers] = useState(false);
+  const [showTrivia, setShowTrivia] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -188,6 +190,9 @@ export default function StudyGroupRoom() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => setShowTrivia(true)} className="p-2 hover:bg-secondary rounded-lg transition-colors text-primary hover:text-primary/80" title="Main Cerdas Cermat">
+              <Gamepad2 className="w-5 h-5" />
+            </button>
             <button onClick={() => setShowMembers(true)} className="p-2 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground" title="Daftar Anggota">
               <Users className="w-5 h-5" />
             </button>
@@ -406,6 +411,17 @@ export default function StudyGroupRoom() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TRIVIA BATTLE MODAL */}
+      {showTrivia && user && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <TriviaBattle 
+             roomId={id as string} 
+             user={{ id: user.id, name: profile?.name || "Anonim" }} 
+             onClose={() => setShowTrivia(false)} 
+          />
         </div>
       )}
 
