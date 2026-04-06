@@ -190,6 +190,7 @@ CREATE TABLE IF NOT EXISTS public.study_groups (
   owner_id UUID NOT NULL REFERENCES public.profiles(id),
   discord_link TEXT,
   max_members INTEGER NOT NULL DEFAULT 50,
+  is_private BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
