@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Puzzle, Timer, CheckCircle2, RotateCcw } from "lucide-react";
 
 const WORDS = [
@@ -9,9 +9,14 @@ const WORDS = [
   { word: "BEASISWA", hint: "Bantuan Dana Pendidikan" },
   { word: "REKTOR", hint: "Pemimpin Universitas" },
   { word: "KAMPUS", hint: "Tempat Belajar" },
-  { word: "ALMAMATER", hint: "Jas Kebanggan Mahasiswa" },
+  { word: "ALMAMATER", hint: "Jas Kebanggaan Mahasiswa" },
   { word: "SEMESTER", hint: "Periode Belajar" },
-  { word: "SKS", hint: "Satuan Kredit Semester" },
+  { word: "KURIKULUM", hint: "Susunan Mata Pelajaran" },
+  { word: "DEKAN", hint: "Pemimpin Fakultas" },
+  { word: "WISUDA", hint: "Upacara Kelulusan" },
+  { word: "AKADEMIK", hint: "Berkaitan dengan Pendidikan" },
+  { word: "PENELITIAN", hint: "Studi Ilmiah" },
+  { word: "LABORATORIUM", hint: "Tempat Praktikum" },
 ];
 
 export function WordScramble() {
@@ -23,54 +28,70 @@ export function WordScramble() {
   const [isFinished, setIsFinished] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const shuffleWord = (word: string) => {
-    let _word = word.split("");
+  const shuffleWord = useCallback((word: string): string => {
+    const _word = word.split("");
     for (let i = _word.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [_word[i], _word[j]] = [_word[j], _word[i]];
     }
-    // Prevent it from accidentally being the correct word
     const scrambled = _word.join("");
     if (scrambled === word) return shuffleWord(word);
     return scrambled;
-  };
+  }, []);
 
-  const nextWord = () => {
+  const nextWord = useCallback(() => {
     const random = WORDS[Math.floor(Math.random() * WORDS.length)];
     setCurrentWord({
       ...random,
       scrambled: shuffleWord(random.word)
     });
     setUserInput("");
-  };
+  }, [shuffleWord]);
 
-  const initGame = () => {
+  const stopTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const initGame = useCallback(() => {
+    stopTimer();
     setScore(0);
     setTimeLeft(60);
     setIsPlaying(false);
     setIsFinished(false);
     nextWord();
-    if (inputRef.current) inputRef.current.focus();
-  };
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [stopTimer, nextWord]);
+
+  const startTimer = useCallback(() => {
+    stopTimer();
+    intervalRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          stopTimer();
+          setIsPlaying(false);
+          setIsFinished(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [stopTimer]);
 
   useEffect(() => {
     initGame();
-  }, []);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    } else if (timeLeft === 0 && isPlaying) {
-      setIsPlaying(false);
-      setIsFinished(true);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, timeLeft]);
+    return () => stopTimer();
+  }, [initGame, stopTimer]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isPlaying && !isFinished) setIsPlaying(true);
+    if (!isPlaying && !isFinished) {
+      setIsPlaying(true);
+      startTimer();
+    }
     setUserInput(e.target.value.toUpperCase());
   };
 
@@ -80,7 +101,6 @@ export function WordScramble() {
         setScore((s) => s + 10);
         nextWord();
       } else {
-        // Wrong answer visual feedback can be added here
         setUserInput("");
       }
     }

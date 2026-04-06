@@ -32,13 +32,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, authUser?: User | null) => {
     try {
       const { data } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .single();
+
+      if (data) {
+        // Auto-repair empty profile name from auth metadata or email
+        if (!data.name || data.name.trim() === "") {
+          const currentUser = authUser || (await supabase.auth.getUser()).data.user;
+          const fallbackName =
+            currentUser?.user_metadata?.name ||
+            currentUser?.user_metadata?.full_name ||
+            currentUser?.email?.split("@")[0] ||
+            "Pejuang PTN";
+
+          // Update in DB so it persists
+          await supabase
+            .from("profiles")
+            .update({ name: fallbackName })
+            .eq("id", userId);
+
+          data.name = fallbackName;
+        }
+      }
+
       setProfile(data);
     } catch (err) {
       console.error("Error fetching profile:", err);
@@ -66,12 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const getUser = async () => {
       try {
         const {
-          data: { user },
+          data: { user: authUser },
         } = await supabase.auth.getUser();
         if (!isMounted) return;
-        setUser(user);
-        if (user) {
-          await fetchProfile(user.id);
+        setUser(authUser);
+        if (authUser) {
+          await fetchProfile(authUser.id, authUser);
         }
       } catch (err) {
         console.error("Error getting user:", err);

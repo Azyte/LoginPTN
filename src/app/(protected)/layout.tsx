@@ -31,7 +31,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const { profile, signOut, loading } = useAuth();
+  const { profile, user, signOut, loading } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
 
   if (loading) {
@@ -165,10 +165,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
               <Link href="/profile" className="flex items-center gap-2 pl-3 border-l border-border/50">
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
-                  {profile?.name ? getInitials(profile.name) : "?"}
+                  {profile?.name ? getInitials(profile.name) : user?.email?.charAt(0)?.toUpperCase() || "?"}
                 </div>
                 <div className="hidden sm:block">
-                  <div className="text-sm font-medium leading-none">{profile?.name || "User"}</div>
+                  <div className="text-sm font-medium leading-none">{profile?.name || user?.email?.split('@')[0] || "User"}</div>
                   <div className="text-xs text-muted-foreground capitalize">{profile?.role || "student"}</div>
                 </div>
               </Link>

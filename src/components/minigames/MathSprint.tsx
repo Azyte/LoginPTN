@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Calculator, Timer, Trophy, RotateCcw } from "lucide-react";
 
 type Problem = {
@@ -15,11 +15,12 @@ export function MathSprint() {
   const [userInput, setUserInput] = useState("");
   
   const inputRef = useRef<HTMLInputElement>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const generateProblem = () => {
+  const generateProblem = useCallback(() => {
     const operators = ["+", "-", "*"];
     const op = operators[Math.floor(Math.random() * operators.length)];
-    let a, b, answer;
+    let a: number, b: number, answer: number;
 
     if (op === "+") {
       a = Math.floor(Math.random() * 50) + 1;
@@ -27,7 +28,7 @@ export function MathSprint() {
       answer = a + b;
     } else if (op === "-") {
       a = Math.floor(Math.random() * 50) + 20;
-      b = Math.floor(Math.random() * a); // ensure positive result
+      b = Math.floor(Math.random() * a);
       answer = a - b;
     } else {
       a = Math.floor(Math.random() * 12) + 2;
@@ -36,35 +37,46 @@ export function MathSprint() {
     }
 
     setCurrentProblem({ text: `${a} ${op} ${b}`, answer });
-  };
+  }, []);
 
-  const initGame = () => {
+  const stopTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const initGame = useCallback(() => {
+    stopTimer();
     setScore(0);
     setTimeLeft(60);
     setUserInput("");
-    setIsStarted(false);
+    setIsPlaying(false);
     setIsFinished(false);
     generateProblem();
-    if (inputRef.current) inputRef.current.focus();
-  };
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [generateProblem, stopTimer]);
 
-  // Alias for isStarted
-  const setIsStarted = setIsPlaying;
+  const startTimer = useCallback(() => {
+    stopTimer();
+    intervalRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          stopTimer();
+          setIsPlaying(false);
+          setIsFinished(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [stopTimer]);
 
+  // Initialize game on mount
   useEffect(() => {
     initGame();
-  }, []);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    } else if (timeLeft === 0 && isPlaying) {
-      setIsPlaying(false);
-      setIsFinished(true);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, timeLeft]);
+    return () => stopTimer();
+  }, [initGame, stopTimer]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -72,10 +84,10 @@ export function MathSprint() {
 
     if (!isPlaying && !isFinished) {
       setIsPlaying(true);
+      startTimer();
     }
   };
 
-  // Submit on enter or auto-submit
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && userInput.trim() !== "") {
       checkAnswer();
@@ -88,7 +100,6 @@ export function MathSprint() {
       generateProblem();
       setUserInput("");
     } else {
-      // Small penalty or just clear input (let's just clear to keep it fast)
       setUserInput("");
     }
   };

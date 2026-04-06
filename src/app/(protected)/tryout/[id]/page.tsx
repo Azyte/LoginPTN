@@ -6,6 +6,23 @@ import { Clock, ChevronLeft, ChevronRight, Flag, AlertTriangle, Loader2 } from "
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/providers/auth-provider";
 
+// Seeded shuffle for consistent shuffling per attempt
+function seededShuffle<T>(array: T[], seed: string): T[] {
+  const arr = [...array];
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0;
+  }
+  for (let i = arr.length - 1; i > 0; i--) {
+    hash = (hash * 1664525 + 1013904223) | 0;
+    const j = ((hash < 0 ? ~hash : hash) % (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export default function TryoutTakePage() {
   const router = useRouter();
   const params = useParams();
@@ -20,6 +37,7 @@ export default function TryoutTakePage() {
   const [currentSection, setCurrentSection] = useState(0);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [correctAnswerMap, setCorrectAnswerMap] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
@@ -47,12 +65,53 @@ export default function TryoutTakePage() {
       
       if (data) {
         setTryout(data);
-        const sortedSections = (data.tryout_sections || []).sort((a: any, b: any) => a.order_index - b.order_index).map((sec: any) => ({
-          ...sec,
-          questions: (sec.tryout_questions || [])
+        
+        // Build correct answer map (kept separate, NOT in questions shown to user)
+        const answerMap: Record<string, string> = {};
+        
+        const sortedSections = (data.tryout_sections || []).sort((a: any, b: any) => a.order_index - b.order_index).map((sec: any) => {
+          const questions = (sec.tryout_questions || [])
             .sort((qa: any, qb: any) => qa.order_index - qb.order_index)
-            .map((tq: any) => tq.questions)
-        }));
+            .map((tq: any) => {
+              const q = tq.questions;
+              if (!q) return null;
+              
+              // Extract correct answer key BEFORE stripping it
+              let correctKey = "";
+              try {
+                if (typeof q.correct_answer === 'object' && q.correct_answer !== null) {
+                  correctKey = q.correct_answer.key || String(q.correct_answer);
+                } else if (typeof q.correct_answer === 'string') {
+                  try {
+                    const parsed = JSON.parse(q.correct_answer);
+                    correctKey = parsed.key || String(parsed);
+                  } catch {
+                    correctKey = String(q.correct_answer).replace(/[\`'"/]/g, "");
+                  }
+                }
+              } catch {
+                correctKey = String(q.correct_answer || "").replace(/[\`'"/]/g, "");
+              }
+              answerMap[q.id] = correctKey;
+              
+              // Return question WITHOUT correct_answer and explanation
+              return {
+                id: q.id,
+                content: q.content,
+                options: q.options,
+                difficulty: q.difficulty,
+                type: q.type,
+              };
+            })
+            .filter(Boolean);
+          
+          return {
+            ...sec,
+            questions,
+          };
+        });
+        
+        setCorrectAnswerMap(answerMap);
         setSections(sortedSections);
         if (sortedSections.length > 0) {
           setTimeLeft(sortedSections[0].duration_minutes * 60);
@@ -119,18 +178,7 @@ export default function TryoutTakePage() {
         if (!q) return;
         totalQuestions++;
         const userAnswer = answers[q.id];
-        let correctKey = "";
-        
-        try {
-          if (typeof q.correct_answer === 'object' && q.correct_answer !== null) {
-            correctKey = q.correct_answer.key || q.correct_answer;
-          } else if (typeof q.correct_answer === 'string') {
-            const parsed = JSON.parse(q.correct_answer);
-            correctKey = parsed.key || parsed;
-          }
-        } catch {
-          correctKey = String(q.correct_answer).replace(/['"]/g, "");
-        }
+        const correctKey = correctAnswerMap[q.id] || "";
         
         const isCorrect = userAnswer === correctKey;
         if (isCorrect) correctCount++;
