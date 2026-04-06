@@ -37,90 +37,98 @@ export default function DashboardPage() {
     setQuote(AMBIS_QUOTES[Math.floor(Math.random() * AMBIS_QUOTES.length)]);
     
     async function loadDashboardData() {
-      if (!profile) return;
+      if (!profile) {
+        setLoading(false);
+        return;
+      }
       
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
-      const userId = userData.user.id;
-
-      const [
-        { count: answeredCount, data: answersData },
-        { count: tryoutsCount },
-        { data: streakData },
-        { data: subjectsData }
-      ] = await Promise.all([
-        supabase.from("user_answers").select("created_at, is_correct, questions(subject_id)", { count: "exact" }).eq("user_id", userId),
-        supabase.from("tryout_attempts").select("*", { count: "exact", head: true }).eq("user_id", userId).eq("status", "completed"),
-        supabase.from("user_streaks").select("current_streak").eq("user_id", userId).maybeSingle(),
-        supabase.from("subjects").select("*").order("id", { ascending: true })
-      ]);
-
-      let correct = 0;
-      let acc = 0;
-      const activityMap: Record<string, number> = {};
-      
-      // Tracking progress for each subject
-      const subjectStats: Record<number, { correct: number; total: number }> = {};
-
-      if (answersData) {
-        answersData.forEach((ans: any) => {
-          if (ans.is_correct) correct++;
-          const date = new Date(ans.created_at).toISOString().split("T")[0];
-          activityMap[date] = (activityMap[date] || 0) + 1;
-
-          // Track subject specifics
-          const subjId = ans.questions?.subject_id;
-          if (subjId) {
-            if (!subjectStats[subjId]) subjectStats[subjId] = { correct: 0, total: 0 };
-            subjectStats[subjId].total += 1;
-            if (ans.is_correct) subjectStats[subjId].correct += 1;
-          }
-        });
-
-        if (answersData.length > 0) {
-          acc = Math.round((correct / answersData.length) * 100);
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) {
+          setLoading(false);
+          return;
         }
-      }
+        const userId = userData.user.id;
 
-      setStats({
-        questionsAnswered: answeredCount || 0,
-        tryoutsCompleted: tryoutsCount || 0,
-        accuracy: acc,
-        streak: streakData?.current_streak || 0
-      });
+        const [
+          { count: answeredCount, data: answersData },
+          { count: tryoutsCount },
+          { data: streakData },
+          { data: subjectsData }
+        ] = await Promise.all([
+          supabase.from("user_answers").select("created_at, is_correct, questions(subject_id)", { count: "exact" }).eq("user_id", userId),
+          supabase.from("tryout_attempts").select("*", { count: "exact", head: true }).eq("user_id", userId).eq("status", "completed"),
+          supabase.from("user_streaks").select("current_streak").eq("user_id", userId).maybeSingle(),
+          supabase.from("subjects").select("*").order("id", { ascending: true })
+        ]);
 
-      // Map dynamic subject progresses
-      if (subjectsData) {
-        const mappedSubjects = subjectsData.map(subject => {
-          const st = subjectStats[subject.id];
-          const calcProgress = st ? Math.round((st.correct / st.total) * 100) : 0;
-          return {
-            ...subject,
-            progress: calcProgress,
-            totalAnswered: st?.total || 0
-          };
+        let correct = 0;
+        let acc = 0;
+        const activityMap: Record<string, number> = {};
+        
+        const subjectStats: Record<number, { correct: number; total: number }> = {};
+
+        if (answersData) {
+          answersData.forEach((ans: any) => {
+            if (ans.is_correct) correct++;
+            const date = new Date(ans.created_at).toISOString().split("T")[0];
+            activityMap[date] = (activityMap[date] || 0) + 1;
+
+            const subjId = ans.questions?.subject_id;
+            if (subjId) {
+              if (!subjectStats[subjId]) subjectStats[subjId] = { correct: 0, total: 0 };
+              subjectStats[subjId].total += 1;
+              if (ans.is_correct) subjectStats[subjId].correct += 1;
+            }
+          });
+
+          if (answersData.length > 0) {
+            acc = Math.round((correct / answersData.length) * 100);
+          }
+        }
+
+        setStats({
+          questionsAnswered: answeredCount || 0,
+          tryoutsCompleted: tryoutsCount || 0,
+          accuracy: acc,
+          streak: streakData?.current_streak || 0
         });
-        // Sort subjects by those we answered most to show them
-        mappedSubjects.sort((a, b) => b.totalAnswered - a.totalAnswered);
-        setSubjectProgress(mappedSubjects.slice(0, 5));
-      }
 
-      // Generate activity calendar data
-      const days = [];
-      for (let i = 90; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split("T")[0];
-        days.push({
-          date: dateStr,
-          count: activityMap[dateStr] || 0,
-        });
+        if (subjectsData) {
+          const mappedSubjects = subjectsData.map(subject => {
+            const st = subjectStats[subject.id];
+            const calcProgress = st ? Math.round((st.correct / st.total) * 100) : 0;
+            return {
+              ...subject,
+              progress: calcProgress,
+              totalAnswered: st?.total || 0
+            };
+          });
+          mappedSubjects.sort((a, b) => b.totalAnswered - a.totalAnswered);
+          setSubjectProgress(mappedSubjects.slice(0, 5));
+        }
+
+        const days = [];
+        for (let i = 90; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateStr = date.toISOString().split("T")[0];
+          days.push({
+            date: dateStr,
+            count: activityMap[dateStr] || 0,
+          });
+        }
+        setRecentActivity(days);
+      } catch (err) {
+        console.error("Dashboard load error:", err);
+      } finally {
+        setLoading(false);
       }
-      setRecentActivity(days);
-      setLoading(false);
     }
     
-    loadDashboardData();
+    // Safety timeout: if dashboard takes more than 10s, stop loading
+    const timeout = setTimeout(() => setLoading(false), 10000);
+    loadDashboardData().then(() => clearTimeout(timeout));
   }, [profile, supabase]);
 
   const quickActions = [
