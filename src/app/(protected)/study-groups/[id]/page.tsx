@@ -6,7 +6,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { Phone, PhoneOff, Mic, MicOff, Send, Users, ArrowLeft, Loader2, MessageCircle, Paperclip, FileText, Download, Trash2, ShieldAlert, Gamepad2 } from "lucide-react";
-import { TriviaBattle } from "@/components/ui/TriviaBattle";
+import { MultiplayerGameModal } from "@/components/ui/MultiplayerGameModal";
 
 export default function StudyGroupRoom() {
   const { id } = useParams();
@@ -417,7 +417,7 @@ export default function StudyGroupRoom() {
       {/* TRIVIA BATTLE MODAL */}
       {showTrivia && user && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <TriviaBattle 
+          <MultiplayerGameModal 
              roomId={id as string} 
              user={{ id: user.id, name: profile?.name || "Anonim" }} 
              onClose={() => setShowTrivia(false)} 
