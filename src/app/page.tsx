@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import {
   BookOpen, Brain, BarChart3, Users, Bot, GraduationCap,
   ArrowRight, Sparkles, Target, Trophy, Zap, ChevronRight,
-  Star, CheckCircle2, TrendingUp
+  Star, CheckCircle2, TrendingUp, Gamepad2, FileText, HardDrive
 } from "lucide-react";
 
 function AnimatedCounter({ end, duration = 2000, suffix = "" }: { end: number; duration?: number; suffix?: string }) {
@@ -55,8 +55,32 @@ const features = [
   {
     icon: Users,
     title: "Study Groups",
-    description: "Belajar bareng teman! Buat grup, diskusi real-time, dan motivasi satu sama lain.",
+    description: "Belajar bareng teman! Buat grup, diskusi real-time, main cerdas cermat, dan saling motivasi.",
     gradient: "from-emerald-500 to-teal-500",
+  },
+  {
+    icon: Trophy,
+    title: "Realtime Leaderboard",
+    description: "Berkompetisi dengan seluruh siswa di Indonesia. Kumpulkan poin dan ukir namamu di podium juara secara langsung.",
+    gradient: "from-yellow-400 to-amber-600",
+  },
+  {
+    icon: Gamepad2,
+    title: "Minigames Arcade",
+    description: "Lelah belajar? Refresh otakmu dengan game edukaif seperti Brain Memory, Typo Racing, dan Cerdas Cermat.",
+    gradient: "from-cyan-500 to-blue-600",
+  },
+  {
+    icon: FileText,
+    title: "PDF Workspace",
+    description: "Baca modul materi berdampingan langsung dengan catatan. AI siap membantu merangkum isi PDF kamu seketika.",
+    gradient: "from-rose-400 to-red-500",
+  },
+  {
+    icon: HardDrive,
+    title: "Cloud Study Drive",
+    description: "Simpan semua catatan, rumus, dan hasil belajarmu di cloud. Bagikan ke study group dengan satu kali klik.",
+    gradient: "from-slate-500 to-gray-700",
   },
 ];
 
