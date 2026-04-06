@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types";
 import type { User } from "@supabase/supabase-js";
@@ -32,51 +32,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
-  const fetchProfile = async (userId: string, authUser?: User | null) => {
+  // Build a fallback profile from the auth User object so the UI never shows "User"
+  const buildFallbackProfile = useCallback((authUser: User): Profile => ({
+    id: authUser.id,
+    name: authUser.user_metadata?.name || authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "Pengguna",
+    email: authUser.email || "",
+    avatar_url: null,
+    role: "student" as const,
+    bio: null,
+    school: null,
+    target_university_id: null,
+    target_major_id: null,
+    language_preference: "id",
+    theme_preference: "dark",
+    study_goal: null,
+    daily_target_minutes: 60,
+    created_at: new Date().toISOString(),
+  }), []);
+
+  const fetchProfile = useCallback(async (authUser: User) => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", userId)
+        .eq("id", authUser.id)
         .single();
 
       if (data) {
-        // Auto-repair empty profile name from auth metadata or email
+        // If the name stored in DB is empty, patch it with email prefix
         if (!data.name || data.name.trim() === "") {
-          const currentUser = authUser || (await supabase.auth.getUser()).data.user;
-          const fallbackName =
-            currentUser?.user_metadata?.name ||
-            currentUser?.user_metadata?.full_name ||
-            currentUser?.email?.split("@")[0] ||
-            "Pejuang PTN";
-
-          // Update in DB so it persists
-          await supabase
-            .from("profiles")
-            .update({ name: fallbackName })
-            .eq("id", userId);
-
-          data.name = fallbackName;
+          const emailName = authUser.email?.split("@")[0] || "Pengguna";
+          data.name = emailName;
+          // Fire-and-forget update so it sticks for next time
+          supabase.from("profiles").update({ name: emailName }).eq("id", authUser.id).then(() => {});
         }
+        setProfile(data);
+      } else {
+        console.warn("Profile fetch issue:", error?.message);
+        setProfile(buildFallbackProfile(authUser));
       }
-
-      setProfile(data);
     } catch (err) {
       console.error("Error fetching profile:", err);
-      setProfile(null);
+      setProfile(buildFallbackProfile(authUser));
     }
-  };
+  }, [supabase, buildFallbackProfile]);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) {
-      await fetchProfile(user.id);
+      await fetchProfile(user);
     }
-  };
+  }, [user, fetchProfile]);
 
   useEffect(() => {
     let isMounted = true;
 
-    // Safety timeout: if auth takes more than 8 seconds, stop loading to prevent infinite spinner
     const safetyTimeout = setTimeout(() => {
       if (isMounted && loading) {
         console.warn("Auth loading timeout — forcing load complete");
@@ -86,32 +95,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const getUser = async () => {
       try {
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
         if (!isMounted) return;
         setUser(authUser);
         if (authUser) {
-          await fetchProfile(authUser.id, authUser);
+          await fetchProfile(authUser);
         }
       } catch (err) {
         console.error("Error getting user:", err);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
     getUser();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!isMounted) return;
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser) {
-        await fetchProfile(currentUser.id);
+        await fetchProfile(currentUser);
       } else {
         setProfile(null);
       }

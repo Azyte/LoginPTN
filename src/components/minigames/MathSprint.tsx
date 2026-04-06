@@ -1,105 +1,86 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Calculator, Timer, Trophy, RotateCcw } from "lucide-react";
+import { Calculator, Timer, Trophy, RotateCcw, Play } from "lucide-react";
 
 type Problem = {
   text: string;
   answer: number;
 };
 
+function generateNewProblem(): Problem {
+  const operators = ["+", "-", "×"];
+  const op = operators[Math.floor(Math.random() * operators.length)];
+  let a: number, b: number, answer: number;
+
+  if (op === "+") {
+    a = Math.floor(Math.random() * 50) + 1;
+    b = Math.floor(Math.random() * 50) + 1;
+    answer = a + b;
+  } else if (op === "-") {
+    a = Math.floor(Math.random() * 50) + 20;
+    b = Math.floor(Math.random() * a);
+    answer = a - b;
+  } else {
+    a = Math.floor(Math.random() * 12) + 2;
+    b = Math.floor(Math.random() * 12) + 2;
+    answer = a * b;
+  }
+
+  return { text: `${a} ${op} ${b}`, answer };
+}
+
 export function MathSprint() {
   const [timeLeft, setTimeLeft] = useState(60);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isFinished, setIsFinished] = useState(false);
+  const [gameState, setGameState] = useState<"idle" | "playing" | "finished">("idle");
   const [score, setScore] = useState(0);
-  const [currentProblem, setCurrentProblem] = useState<Problem>({ text: "0 + 0", answer: 0 });
+  const [currentProblem, setCurrentProblem] = useState<Problem>(generateNewProblem);
   const [userInput, setUserInput] = useState("");
-  
   const inputRef = useRef<HTMLInputElement>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const generateProblem = useCallback(() => {
-    const operators = ["+", "-", "*"];
-    const op = operators[Math.floor(Math.random() * operators.length)];
-    let a: number, b: number, answer: number;
-
-    if (op === "+") {
-      a = Math.floor(Math.random() * 50) + 1;
-      b = Math.floor(Math.random() * 50) + 1;
-      answer = a + b;
-    } else if (op === "-") {
-      a = Math.floor(Math.random() * 50) + 20;
-      b = Math.floor(Math.random() * a);
-      answer = a - b;
-    } else {
-      a = Math.floor(Math.random() * 12) + 2;
-      b = Math.floor(Math.random() * 12) + 2;
-      answer = a * b;
-    }
-
-    setCurrentProblem({ text: `${a} ${op} ${b}`, answer });
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, []);
 
-  const stopTimer = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
-
-  const initGame = useCallback(() => {
-    stopTimer();
+  const startGame = useCallback(() => {
     setScore(0);
     setTimeLeft(60);
     setUserInput("");
-    setIsPlaying(false);
-    setIsFinished(false);
-    generateProblem();
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }, [generateProblem, stopTimer]);
+    setCurrentProblem(generateNewProblem());
+    setGameState("playing");
 
-  const startTimer = useCallback(() => {
-    stopTimer();
-    intervalRef.current = setInterval(() => {
+    // Clear any existing timer
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    // Start a fresh timer
+    timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          stopTimer();
-          setIsPlaying(false);
-          setIsFinished(true);
+          if (timerRef.current) clearInterval(timerRef.current);
+          timerRef.current = null;
+          setGameState("finished");
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  }, [stopTimer]);
 
-  // Initialize game on mount
-  useEffect(() => {
-    initGame();
-    return () => stopTimer();
-  }, [initGame, stopTimer]);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setUserInput(val);
-
-    if (!isPlaying && !isFinished) {
-      setIsPlaying(true);
-      startTimer();
-    }
+    if (gameState !== "playing") return;
+    setUserInput(e.target.value);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && userInput.trim() !== "") {
-      checkAnswer();
-    }
-  };
-
-  const checkAnswer = () => {
-    if (parseInt(userInput) === currentProblem.answer) {
-      setScore((s) => s + 10);
-      generateProblem();
-      setUserInput("");
-    } else {
+    if (e.key === "Enter" && userInput.trim() !== "" && gameState === "playing") {
+      if (parseInt(userInput) === currentProblem.answer) {
+        setScore((s) => s + 10);
+      }
+      setCurrentProblem(generateNewProblem());
       setUserInput("");
     }
   };
@@ -117,30 +98,38 @@ export function MathSprint() {
               <div className="text-2xl font-black">{score}</div>
             </div>
           </div>
-          <button onClick={initGame} className="p-3 bg-secondary hover:bg-muted text-foreground rounded-full transition-colors focus:outline-none">
+          <button onClick={startGame} className="p-3 bg-secondary hover:bg-muted text-foreground rounded-full transition-colors focus:outline-none" title="Reset">
             <RotateCcw className="w-5 h-5" />
           </button>
        </div>
 
        <div className="bg-card border border-primary/20 rounded-3xl p-8 shadow-sm flex flex-col items-center justify-center min-h-[300px]">
-          {isFinished ? (
+          {gameState === "finished" ? (
             <div className="text-center animate-in zoom-in duration-300">
                <Calculator className="w-16 h-16 text-primary mx-auto mb-4 opacity-50" />
                <h2 className="text-3xl font-black mb-2">Waktu Habis!</h2>
                <p className="text-muted-foreground mb-6">Kamu mengumpulkan <span className="text-primary font-bold">{score} poin</span>.</p>
-               <button onClick={initGame} className="bg-primary text-primary-foreground font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity">
+               <button onClick={startGame} className="bg-primary text-primary-foreground font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity">
                  Coba Lagi
+               </button>
+            </div>
+          ) : gameState === "idle" ? (
+            <div className="text-center animate-in zoom-in duration-300">
+               <Calculator className="w-16 h-16 text-primary mx-auto mb-4 opacity-30" />
+               <h2 className="text-2xl font-black mb-2">Math Sprint ⚡</h2>
+               <p className="text-muted-foreground mb-6 text-sm">Jawab soal matematika sebanyak-banyaknya dalam 60 detik!</p>
+               <button onClick={startGame} className="bg-primary text-primary-foreground font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto">
+                 <Play className="w-5 h-5" /> Mulai!
                </button>
             </div>
           ) : (
              <>
                <div className="text-xs text-muted-foreground font-bold uppercase tracking-widest mb-6">
-                  {isPlaying ? "Pertanyaan" : "Ketik jawaban & Entar"}
+                  Jawab & Tekan Enter
                </div>
                <div className="text-6xl sm:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-primary to-accent mb-12 tracking-wider">
                   {currentProblem.text}
                </div>
-
                <div className="w-full relative">
                  <input
                    ref={inputRef}
@@ -149,11 +138,11 @@ export function MathSprint() {
                    onChange={handleInputChange}
                    onKeyDown={handleKeyDown}
                    placeholder="?"
-                   className="w-full text-center text-4xl font-bold bg-secondary/50 border-2 border-border/50 rounded-2xl py-4 focus:outline-none focus:border-primary transition-colors"
+                   className="w-full text-center text-4xl font-bold bg-secondary/50 border-2 border-border/50 rounded-2xl py-4 focus:outline-none focus:border-primary transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                    autoFocus
                  />
                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                    Tekan Enter ↵
+                    Enter ↵
                  </div>
                </div>
              </>

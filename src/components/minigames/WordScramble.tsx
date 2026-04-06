@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Puzzle, Timer, CheckCircle2, RotateCcw } from "lucide-react";
+import { Puzzle, Timer, CheckCircle2, RotateCcw, Play } from "lucide-react";
 
 const WORDS = [
   { word: "UNIVERSITAS", hint: "Perguruan Tinggi" },
@@ -11,95 +11,75 @@ const WORDS = [
   { word: "KAMPUS", hint: "Tempat Belajar" },
   { word: "ALMAMATER", hint: "Jas Kebanggaan Mahasiswa" },
   { word: "SEMESTER", hint: "Periode Belajar" },
-  { word: "KURIKULUM", hint: "Susunan Mata Pelajaran" },
-  { word: "DEKAN", hint: "Pemimpin Fakultas" },
-  { word: "WISUDA", hint: "Upacara Kelulusan" },
-  { word: "AKADEMIK", hint: "Berkaitan dengan Pendidikan" },
-  { word: "PENELITIAN", hint: "Studi Ilmiah" },
+  { word: "KURIKULUM", hint: "Rencana Pembelajaran" },
+  { word: "DIPLOMA", hint: "Ijazah Pendidikan" },
+  { word: "PENELITIAN", hint: "Riset Ilmiah" },
   { word: "LABORATORIUM", hint: "Tempat Praktikum" },
+  { word: "PERPUSTAKAAN", hint: "Tempat Meminjam Buku" },
 ];
+
+function shuffleWord(word: string): string {
+  const arr = word.split("");
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  const result = arr.join("");
+  if (result === word) return shuffleWord(word);
+  return result;
+}
 
 export function WordScramble() {
   const [currentWord, setCurrentWord] = useState({ word: "", hint: "", scrambled: "" });
   const [userInput, setUserInput] = useState("");
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isFinished, setIsFinished] = useState(false);
-  
+  const [gameState, setGameState] = useState<"idle" | "playing" | "finished">("idle");
   const inputRef = useRef<HTMLInputElement>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const shuffleWord = useCallback((word: string): string => {
-    const _word = word.split("");
-    for (let i = _word.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [_word[i], _word[j]] = [_word[j], _word[i]];
-    }
-    const scrambled = _word.join("");
-    if (scrambled === word) return shuffleWord(word);
-    return scrambled;
+  useEffect(() => {
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
-  const nextWord = useCallback(() => {
+  const pickWord = useCallback(() => {
     const random = WORDS[Math.floor(Math.random() * WORDS.length)];
-    setCurrentWord({
-      ...random,
-      scrambled: shuffleWord(random.word)
-    });
+    setCurrentWord({ ...random, scrambled: shuffleWord(random.word) });
     setUserInput("");
-  }, [shuffleWord]);
-
-  const stopTimer = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
   }, []);
 
-  const initGame = useCallback(() => {
-    stopTimer();
+  const startGame = useCallback(() => {
     setScore(0);
     setTimeLeft(60);
-    setIsPlaying(false);
-    setIsFinished(false);
-    nextWord();
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }, [stopTimer, nextWord]);
+    setGameState("playing");
+    pickWord();
 
-  const startTimer = useCallback(() => {
-    stopTimer();
-    intervalRef.current = setInterval(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          stopTimer();
-          setIsPlaying(false);
-          setIsFinished(true);
+          if (timerRef.current) clearInterval(timerRef.current);
+          timerRef.current = null;
+          setGameState("finished");
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  }, [stopTimer]);
 
-  useEffect(() => {
-    initGame();
-    return () => stopTimer();
-  }, [initGame, stopTimer]);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, [pickWord]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isPlaying && !isFinished) {
-      setIsPlaying(true);
-      startTimer();
-    }
+    if (gameState !== "playing") return;
     setUserInput(e.target.value.toUpperCase());
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && gameState === "playing") {
       if (userInput === currentWord.word) {
         setScore((s) => s + 10);
-        nextWord();
+        pickWord();
       } else {
         setUserInput("");
       }
@@ -119,19 +99,28 @@ export function WordScramble() {
               <div className="text-2xl font-black">{score}</div>
             </div>
           </div>
-          <button onClick={initGame} className="p-3 bg-secondary hover:bg-muted text-foreground rounded-full transition-colors focus:outline-none">
+          <button onClick={startGame} className="p-3 bg-secondary hover:bg-muted text-foreground rounded-full transition-colors focus:outline-none">
             <RotateCcw className="w-5 h-5" />
           </button>
        </div>
 
        <div className="bg-card border border-primary/20 rounded-3xl p-8 shadow-sm flex flex-col items-center min-h-[350px]">
-          {isFinished ? (
+          {gameState === "finished" ? (
             <div className="text-center animate-in zoom-in duration-300 w-full flex-1 flex flex-col justify-center">
                <Puzzle className="w-16 h-16 text-primary mx-auto mb-4 opacity-50" />
                <h2 className="text-3xl font-black mb-2">Waktu Habis!</h2>
                <p className="text-muted-foreground mb-6">Kamu berhasil menebak kata dengan <span className="text-primary font-bold">{score} poin</span>.</p>
-               <button onClick={initGame} className="bg-primary text-primary-foreground font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity">
+               <button onClick={startGame} className="bg-primary text-primary-foreground font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity">
                  Coba Lagi
+               </button>
+            </div>
+          ) : gameState === "idle" ? (
+            <div className="text-center w-full flex-1 flex flex-col justify-center animate-in zoom-in duration-300">
+               <Puzzle className="w-16 h-16 text-primary mx-auto mb-4 opacity-30" />
+               <h2 className="text-2xl font-black mb-2">Word Scramble 🔤</h2>
+               <p className="text-muted-foreground mb-6 text-sm">Susun ulang huruf acak menjadi kata yang benar!</p>
+               <button onClick={startGame} className="bg-primary text-primary-foreground font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto">
+                 <Play className="w-5 h-5" /> Mulai!
                </button>
             </div>
           ) : (
