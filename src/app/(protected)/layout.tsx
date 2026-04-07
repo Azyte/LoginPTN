@@ -27,6 +27,14 @@ const navItems = [
   { href: "/tips-strategi", label: "Tips & Strategi", icon: Lightbulb },
 ];
 
+const bottomNavItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/bank-soal", label: "Bank Soal", icon: BookOpen },
+  { href: "/tryout", label: "Tryout", icon: ClipboardList },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
+  { href: "/study-groups", label: "Ruang Belajar", icon: Users },
+];
+
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -41,7 +49,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     }
   }, [loading, user, router]);
 
-  if (loading || !user) {
+  if (loading && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -51,7 +59,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           <div className="flex flex-col items-center">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="mt-4 text-sm font-medium text-muted-foreground animate-pulse text-center">
-              {!user && !loading ? "Sesi Berakhir. Mengalihkan..." : "Menyiapkan Ruang Belajarmu..."}
+              Menyiapkan Ruang Belajarmu...
             </p>
           </div>
         </div>
@@ -189,12 +197,34 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page Content */}
-        <main className="p-3 sm:p-6 lg:p-8">
+        <main className="p-3 sm:p-6 lg:p-8 pb-24 lg:pb-8">
           {children}
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card/80 backdrop-blur-lg border-t border-border/50 flex items-center justify-around px-2 z-40">
+          {bottomNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-col items-center justify-center gap-1 transition-all ${
+                  isActive ? "text-primary bg-primary/10 px-3 py-1 rounded-xl" : "text-muted-foreground"
+                }`}
+              >
+                <Icon className={`w-5 h-5 ${isActive ? "scale-110" : ""}`} />
+                <span className="text-[10px] font-bold uppercase tracking-tighter">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
         
         {/* Pomodoro Timer available on all protected pages */}
-        <PomodoroWidget />
+        <div className="hidden lg:block">
+           <PomodoroWidget />
+        </div>
       </div>
     </div>
   );

@@ -95,22 +95,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const getUser = async () => {
       try {
-        const { data: { user: authUser }, error } = await supabase.auth.getUser();
-        if (!isMounted) return;
+        // FAST PATH: Get session from local storage first (instant)
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (error) {
-          console.error("Auth error:", error.message);
-          // If error is about invalid JWT or invalid session, clear it locally
-          if (error.status === 401 || error.status === 403 || error.message.includes("JWT")) {
-            console.warn("Session invalid — clearing local state");
-            setUser(null);
-            setProfile(null);
+        if (session?.user) {
+          setUser(session.user);
+          // Set loading false early if we have a user (Optimistic)
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+          // Fetch profile in background
+          fetchProfile(session.user);
+        } else {
+          // If no session, do the formal getUser check (Network)
+          const { data: { user: authUser }, error } = await supabase.auth.getUser();
+          if (!isMounted) return;
+          
+          if (error) {
+            console.error("Auth error:", error.message);
+            if (error.status === 401 || error.status === 403 || error.message.includes("JWT")) {
+              setUser(null);
+              setProfile(null);
+            }
           }
-        }
-        
-        setUser(authUser);
-        if (authUser) {
-          await fetchProfile(authUser);
+          
+          setUser(authUser);
+          if (authUser) {
+            await fetchProfile(authUser);
+          }
         }
       } catch (err) {
         console.error("Error getting user:", err);

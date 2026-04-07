@@ -146,12 +146,29 @@ export default function LeaderboardPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-primary" />
-          <p className="text-sm font-bold text-muted-foreground animate-pulse uppercase tracking-widest">Sinkronisasi Data Nasional...</p>
+      <div className="flex justify-center pt-4">
+        <div className="bg-secondary/30 p-1.5 rounded-2xl flex gap-1 border border-border/50 backdrop-blur-md relative overflow-hidden">
+          {loading && <div className="absolute inset-0 bg-primary/10 animate-pulse pointer-events-none" />}
+          <button
+            onClick={() => setTab("bank-soal")}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              tab === "bank-soal" ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BookOpen className="w-4 h-4" /> Bank Soal
+          </button>
+          <button
+            onClick={() => setTab("tryout")}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              tab === "tryout" ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ClipboardList className="w-4 h-4" /> Tryout SNBT
+          </button>
         </div>
-      ) : currentData.length === 0 ? (
+      </div>
+
+      {currentData.length === 0 && !loading ? (
         <div className="text-center py-20 border-2 border-dashed border-border/50 rounded-3xl opacity-50">
           <Trophy className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-xl font-bold">Belum Ada Kompetisi</h3>
@@ -160,44 +177,85 @@ export default function LeaderboardPage() {
       ) : (
         <>
           {/* Enhanced Podium */}
-          <div className="flex items-end justify-center gap-2 sm:gap-6 pt-12 pb-8 relative">
+          <div className="flex flex-col sm:flex-row items-center sm:items-end justify-center gap-4 sm:gap-6 pt-8 sm:pt-12 pb-8 relative">
             {/* Background Glow */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/20 rounded-full blur-[100px] -z-10" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 sm:w-64 h-48 sm:h-64 bg-primary/20 rounded-full blur-[80px] sm:blur-[100px] -z-10" />
             
-            {podiumOrder.map((entry, displayIdx) => {
-              const actualRank = podiumRanks[displayIdx];
-              const isFirst = actualRank === 0;
-              const colorClass = actualRank === 0 ? "text-yellow-400" : actualRank === 1 ? "text-slate-300" : "text-amber-600";
-              const borderClass = actualRank === 0 ? "border-yellow-400/50 shadow-yellow-400/20" : actualRank === 1 ? "border-slate-300/50 shadow-slate-300/10" : "border-amber-600/50 shadow-amber-600/10";
-              const heightClass = actualRank === 0 ? "h-40 sm:h-52" : actualRank === 1 ? "h-32 sm:h-40" : "h-28 sm:h-32";
-
-              return (
-                <div key={entry.user_id} className={`flex flex-col items-center transition-transform hover:scale-105 duration-300 ${isFirst ? "z-10" : "z-0"}`}>
-                  <div className="relative mb-4">
-                    <div className={`w-16 h-16 sm:w-24 sm:h-24 rounded-full border-4 flex items-center justify-center overflow-hidden shadow-2xl bg-card ${borderClass}`}>
-                      {entry.avatar_url ? (
-                        <img src={entry.avatar_url} alt={entry.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className={`text-2xl font-black ${colorClass}`}>{entry.name.charAt(0)}</span>
-                      )}
+            {/* Mobile Podium (Stacked) */}
+            <div className="sm:hidden flex flex-col items-center gap-4 w-full px-4">
+               {/* 1st Place (Large) */}
+               {podium[0] && (
+                 <div className="w-full bg-card/80 backdrop-blur-sm border-2 border-yellow-400/50 rounded-3xl p-4 flex items-center gap-4 shadow-xl shadow-yellow-400/10">
+                    <div className="relative">
+                       <div className="w-16 h-16 rounded-2xl border-2 border-yellow-400 flex items-center justify-center overflow-hidden">
+                          {podium[0].avatar_url ? <img src={podium[0].avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-xl font-black text-yellow-400">{podium[0].name.charAt(0)}</span>}
+                       </div>
+                       <Crown className="absolute -top-3 -right-3 w-8 h-8 text-yellow-400" />
                     </div>
-                    <div className="absolute -top-3 -right-3">
-                      {actualRank === 0 ? <Crown className="w-10 h-10 text-yellow-400 drop-shadow-lg" /> : <Medal className={`w-8 h-8 ${colorClass}`} />}
+                    <div className="flex-1 min-w-0">
+                       <div className="text-[10px] text-yellow-400 font-black uppercase tracking-widest mb-0.5">Juara 1 Nasional</div>
+                       <div className="font-bold truncate text-base">{podium[0].name}</div>
+                       <div className="text-[10px] text-muted-foreground font-bold truncate">{podium[0].target_university_id || "TARGET PTN"}</div>
+                    </div>
+                    <div className="text-right">
+                       <div className="text-2xl font-black text-yellow-400">#{1}</div>
+                       <div className="text-[9px] font-bold opacity-70">{podium[0].extra}</div>
+                    </div>
+                 </div>
+               )}
+
+               {/* 2nd & 3rd (Side-by-Side) */}
+               <div className="grid grid-cols-2 gap-3 w-full">
+                  {[podium[1], podium[2]].map((entry, i) => entry && (
+                    <div key={entry.user_id} className={`bg-card/50 border rounded-2xl p-3 flex flex-col items-center text-center ${i === 0 ? "border-slate-300/30" : "border-amber-600/30"}`}>
+                       <div className="w-12 h-12 rounded-xl border-2 mb-2 flex items-center justify-center overflow-hidden">
+                          {entry.avatar_url ? <img src={entry.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="font-bold opacity-50">{entry.name.charAt(0)}</span>}
+                       </div>
+                       <div className="text-[10px] font-bold truncate w-full mb-1">{entry.name}</div>
+                       <div className={`text-lg font-black ${i === 0 ? "text-slate-300" : "text-amber-600"}`}>#{i + 2}</div>
+                       <div className="text-[9px] font-medium opacity-60 italic">{entry.extra}</div>
+                    </div>
+                  ))}
+               </div>
+            </div>
+
+            {/* Desktop Podium (Existing Horizontal) */}
+            <div className="hidden sm:flex items-end justify-center gap-6">
+              {podiumOrder.map((entry, displayIdx) => {
+                const actualRank = podiumRanks[displayIdx];
+                const isFirst = actualRank === 0;
+                const colorClass = actualRank === 0 ? "text-yellow-400" : actualRank === 1 ? "text-slate-300" : "text-amber-600";
+                const borderClass = actualRank === 0 ? "border-yellow-400/50 shadow-yellow-400/20" : actualRank === 1 ? "border-slate-300/50 shadow-slate-300/10" : "border-amber-600/50 shadow-amber-600/10";
+                const heightClass = actualRank === 0 ? "h-52" : actualRank === 1 ? "h-40" : "h-32";
+
+                return (
+                  <div key={entry.user_id} className={`flex flex-col items-center transition-transform hover:scale-105 duration-300 ${isFirst ? "z-10" : "z-0"}`}>
+                    <div className="relative mb-4">
+                      <div className={`w-24 h-24 rounded-full border-4 flex items-center justify-center overflow-hidden shadow-2xl bg-card ${borderClass}`}>
+                        {entry.avatar_url ? (
+                          <img src={entry.avatar_url} alt={entry.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className={`text-2xl font-black ${colorClass}`}>{entry.name.charAt(0)}</span>
+                        )}
+                      </div>
+                      <div className="absolute -top-3 -right-3">
+                        {actualRank === 0 ? <Crown className="w-10 h-10 text-yellow-400 drop-shadow-lg" /> : <Medal className={`w-8 h-8 ${colorClass}`} />}
+                      </div>
+                    </div>
+                    
+                    <div className="text-center mb-4 space-y-0.5">
+                      <div className="font-black truncate max-w-[140px]">{entry.name}</div>
+                      <div className="text-xs text-primary font-bold uppercase tracking-tighter truncate max-w-[100px]">{entry.target_university_id || "TARGET PTN"}</div>
+                    </div>
+
+                    <div className={`w-32 ${heightClass} bg-card border ${borderClass} rounded-t-3xl shadow-2xl flex flex-col items-center justify-start pt-6 gap-2`}>
+                      <div className={`text-5xl font-black ${colorClass}`}>#{actualRank + 1}</div>
+                      <div className="text-xs font-bold px-3 py-1 bg-secondary/50 rounded-full">{entry.extra}</div>
                     </div>
                   </div>
-                  
-                  <div className="text-center mb-4 space-y-0.5">
-                    <div className="text-sm sm:text-base font-black truncate max-w-[100px] sm:max-w-[140px]">{entry.name}</div>
-                    <div className="text-[10px] sm:text-xs text-primary font-bold uppercase tracking-tighter truncate max-w-[100px]">{entry.target_university_id || "TARGET PTN"}</div>
-                  </div>
-
-                  <div className={`w-24 sm:w-32 ${heightClass} bg-card border ${borderClass} rounded-t-3xl shadow-2xl flex flex-col items-center justify-start pt-6 gap-2`}>
-                    <div className={`text-3xl sm:text-5xl font-black ${colorClass}`}>#{actualRank + 1}</div>
-                    <div className="text-[10px] sm:text-xs font-bold px-3 py-1 bg-secondary/50 rounded-full">{entry.extra}</div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           {/* Rank List */}
