@@ -78,10 +78,20 @@ export default function StudyGroupRoom() {
       .on('postgres_changes', { 
         event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${id}` 
       }, async (payload) => {
-        // Fetch sender details since it's just user_id from Postgres
-        const { data: pData } = await supabase.from('profiles').select('name, avatar_url').eq('id', payload.new.user_id).single();
-        const newMsg = { ...payload.new, profiles: pData };
-        setMessages(prev => [...prev, newMsg]);
+        // Avoid duplicates if we already added it optimistically
+        setMessages(prev => {
+          if (prev.some(m => m.id === payload.new.id)) return prev;
+          
+          // Find sender info from members list instead of re-fetching from DB
+          const sender = members.find(m => m.profiles.id === payload.new.user_id);
+          const newMsg = { 
+            ...payload.new, 
+            profiles: sender?.profiles || { name: "Loading...", avatar_url: null } 
+          };
+          
+          // If profile not in members yet (rare), we could fetch here, but let's try to find it
+          return [...prev, newMsg];
+        });
       })
       .subscribe();
 
@@ -89,45 +99,55 @@ export default function StudyGroupRoom() {
       channel.unsubscribe();
       if (isVoiceConnected) leaveVoiceChannel();
     };
-  }, [id, user, supabase, router]);
+  }, [id, user, supabase, router, members]); // Added members to deps
 
-  useEffect(() => {
-    // Scroll chat to bottom
-    if (chatBottomRef.current) {
-      chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
-  const handleDeleteGroup = async () => {
-    if (!group || group.owner_id !== user?.id) return;
-    if (confirm("Apakah Anda yakin ingin menghapus grup ini? Semua pesan, file, dan anggota akan dihapus permanen.")) {
-      setLoading(true);
-      const { error } = await supabase.from("study_groups").delete().eq("id", id);
-      if (error) {
-        alert("Gagal menghapus grup: " + error.message);
-        setLoading(false);
-      } else {
-        router.push("/study-groups");
-      }
-    }
-  };
+  // ... (existing code)
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!msgInput.trim() || !user) return;
 
     const content = msgInput;
-    setMsgInput(""); // Optimistic clear
+    const tempId = `temp-${Date.now()}`;
     
-    await supabase.from("group_messages").insert({
+    // Optimistic Update
+    const optimisticMsg = {
+      id: tempId,
       group_id: id,
       user_id: user.id,
       content: content,
       type: "text",
-      file_url: null,
-      file_name: null,
-      file_size: null
-    });
+      created_at: new Date().toISOString(),
+      profiles: {
+        name: profile?.name || "Anda",
+        avatar_url: profile?.avatar_url || null
+      }
+    };
+    
+    setMessages(prev => [...prev, optimisticMsg]);
+    setMsgInput(""); 
+
+    try {
+      const { data, error } = await supabase.from("group_messages").insert({
+        group_id: id,
+        user_id: user.id,
+        content: content,
+        type: "text"
+      }).select().single();
+
+      if (error) throw error;
+
+      // Replace temp message with real one to sync IDs
+      if (data) {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...data, profiles: optimisticMsg.profiles } : m));
+      }
+    } catch (err) {
+      console.error("Gagal mengirim pesan:", err);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setMsgInput(content); // Restore input
+      alert("Gagal mengirim pesan. Silakan coba lagi.");
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -194,16 +194,16 @@ export default function BankSoalPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           <button
             onClick={() => handleOpenFolder("acak")}
-            className="group relative overflow-hidden bg-card border-2 border-primary/40 hover:border-primary p-6 rounded-2xl text-left transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1 sm:col-span-2 lg:col-span-3"
+            className="group relative overflow-hidden bg-card border-2 border-primary/40 hover:border-primary p-5 sm:p-6 rounded-2xl text-left transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1 sm:col-span-2 lg:col-span-3"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-bl-full -z-10 transition-transform group-hover:scale-110" />
             <div className="flex items-start justify-between">
               <div>
-                <div className="w-12 h-12 rounded-xl bg-primary/20 text-primary flex items-center justify-center mb-4">
-                  <Shuffle className="w-6 h-6" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/20 text-primary flex items-center justify-center mb-4">
+                  <Shuffle className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                <h3 className="text-xl font-bold mb-1">🎲 Latihan Acak (Quick Play)</h3>
-                <p className="text-sm text-muted-foreground">20 soal campuran tanpa menyimpan riwayat. Sikat habis!</p>
+                <h3 className="text-lg sm:text-xl font-bold mb-1">🎲 Latihan Acak (Quick Play)</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">20 soal campuran tanpa menyimpan riwayat. Sikat habis!</p>
               </div>
             </div>
           </button>
@@ -212,13 +212,13 @@ export default function BankSoalPage() {
             <button
               key={subject.code}
               onClick={() => handleOpenFolder(subject.code)}
-              className="group relative bg-card border border-border/50 hover:border-secondary-foreground/20 p-6 rounded-2xl text-left transition-all card-hover"
+              className="group relative bg-card border border-border/50 hover:border-secondary-foreground/20 p-4 sm:p-6 rounded-2xl text-left transition-all card-hover"
             >
-              <div className="w-12 h-12 rounded-xl bg-secondary text-foreground flex items-center justify-center mb-4 group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-                <Folder className="w-6 h-6" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-secondary text-foreground flex items-center justify-center mb-4 group-hover:bg-primary/20 group-hover:text-primary transition-colors">
+                <Folder className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <h3 className="font-bold mb-1 line-clamp-1">{subject.name}</h3>
-              <div className="flex items-center gap-2 text-primary font-mono font-semibold text-sm">
+              <h3 className="text-sm sm:text-base font-bold mb-1 line-clamp-1">{subject.name}</h3>
+              <div className="flex items-center gap-2 text-primary font-mono font-semibold text-[10px] sm:text-sm">
                 <span>{subject.icon}</span> {subject.code}
               </div>
             </button>
@@ -298,16 +298,16 @@ export default function BankSoalPage() {
                 }`}
               >
                 <div className="flex items-center justify-between mb-5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-bold bg-secondary text-foreground px-3 py-1 rounded-lg">Soal #{globalIdx}</span>
-                    <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-lg font-bold flex items-center gap-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    <span className="text-[10px] sm:text-sm font-bold bg-secondary text-foreground px-2 sm:px-3 py-1 rounded-lg">Soal #{globalIdx}</span>
+                    <span className="text-[10px] bg-primary/10 text-primary px-2 sm:px-3 py-1 rounded-lg font-bold flex items-center gap-1">
                       {subjectData?.icon} {q.subject}
                     </span>
-                    <span className={`text-xs px-3 py-1 rounded-lg font-bold border ${getDifficultyBg(q.difficulty)}`}>
+                    <span className={`text-[10px] px-2 sm:px-3 py-1 rounded-lg font-bold border ${getDifficultyBg(q.difficulty)}`}>
                       {q.difficulty === "easy" ? "Mudah" : q.difficulty === "medium" ? "Sedang" : "Sulit"}
                     </span>
                     {isRevealed && (
-                      <span className={`text-xs px-3 py-1 rounded-lg font-bold flex items-center gap-1 ${isCorrect ? "bg-success text-success-foreground" : "bg-destructive text-destructive-foreground"}`}>
+                      <span className={`text-[10px] px-2 sm:px-3 py-1 rounded-lg font-bold flex items-center gap-1 ${isCorrect ? "bg-success text-success-foreground" : "bg-destructive text-destructive-foreground"}`}>
                         {isCorrect ? <CheckCircle2 className="w-3.5 h-3.5"/> : <XCircle className="w-3.5 h-3.5"/>}
                         {isCorrect ? "Benar" : "Salah"}
                       </span>

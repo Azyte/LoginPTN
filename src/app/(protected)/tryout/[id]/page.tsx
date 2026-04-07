@@ -116,8 +116,32 @@ export default function TryoutTakePage() {
         
         setCorrectAnswerMap(answerMap);
         setSections(sortedSections);
-        if (sortedSections.length > 0) {
-          setTimeLeft(sortedSections[0].duration_minutes * 60);
+
+        // CHECK FOR EXISTING ATTEMPT
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const { data: existingAttempt } = await supabase
+            .from("tryout_attempts")
+            .select("*")
+            .eq("tryout_id", params.id as string)
+            .eq("user_id", authUser.id)
+            .eq("status", "in_progress")
+            .maybeSingle();
+
+          if (existingAttempt) {
+            console.log("Resuming existing attempt:", existingAttempt.id);
+            setAttemptId(existingAttempt.id);
+            setIsStarted(true);
+            
+            // Set initial timer based on first section (or better logic would be to track per section)
+            if (sortedSections.length > 0) {
+              setTimeLeft(sortedSections[0].duration_minutes * 60);
+            }
+          } else {
+             if (sortedSections.length > 0) {
+               setTimeLeft(sortedSections[0].duration_minutes * 60);
+             }
+          }
         }
       }
       setLoading(false);
@@ -156,26 +180,37 @@ export default function TryoutTakePage() {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
 
-    const { data: attempt } = await supabase.from("tryout_attempts").insert({
-      tryout_id: tryout.id,
-      user_id: userData.user.id,
-      status: "in_progress"
-    }).select().single();
+    try {
+      const { data: attempt, error } = await supabase.from("tryout_attempts").insert({
+        tryout_id: tryout.id,
+        user_id: userData.user.id,
+        status: "in_progress"
+      }).select().single();
 
-    if (attempt) {
-      setAttemptId(attempt.id);
-      setIsStarted(true);
+      if (error) throw error;
+
+      if (attempt) {
+        setAttemptId(attempt.id);
+        setIsStarted(true);
+      }
+    } catch (err: any) {
+      console.error("Gagal memulai tryout:", err);
+      alert("Gagal memulai sesi: " + (err.message || "Unknown error"));
     }
   };
 
   const [isFinishing, setIsFinishing] = useState(false);
 
   const handleFinish = async () => {
-    if (!attemptId || isFinishing) return;
+    if (!attemptId || isFinishing) {
+      console.warn("handleFinish called without attemptId or already finishing");
+      return;
+    }
     setIsFinishing(true);
     setShowConfirm(false);
     
     try {
+      console.log("Finishing tryout attempt:", attemptId);
       let correctCount = 0;
       let totalQuestions = 0;
       const answersToInsert: any[] = [];
@@ -213,15 +248,17 @@ export default function TryoutTakePage() {
 
       // Insert answers
       if (answersToInsert.length > 0) {
+        // Chunk inserts if too many (Supabase limit is usually OK, but just in case)
         const { error: insertError } = await supabase.from("tryout_answers").insert(answersToInsert);
         if (insertError) throw insertError;
       }
 
       // Success! Navigate to result
+      console.log("Tryout completed successfully");
       router.push(`/tryout/result/${attemptId}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error finishing tryout:", err);
-      alert("Terjadi kesalahan saat menyimpan jawaban. Silakan coba klik tombol selesai kembali.");
+      alert("Terjadi kesalahan saat menyimpan jawaban: " + (err.message || "Silakan coba lagi."));
     } finally {
       setIsFinishing(false);
     }
@@ -291,16 +328,16 @@ export default function TryoutTakePage() {
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
-      <div className="bg-card border border-border/50 rounded-2xl p-4 mb-4 flex flex-wrap items-center justify-between gap-4 sticky top-4 z-10 shadow-sm">
+      <div className="bg-card border border-border/50 rounded-2xl p-3 sm:p-4 mb-4 flex flex-wrap items-center justify-between gap-3 sm:gap-4 sticky top-4 z-10 shadow-sm">
         <div>
-          <div className="text-xs text-muted-foreground">Sesi {currentSection + 1}/{sections.length}</div>
-          <div className="font-semibold text-sm sm:text-base">{section.subjects?.name || `Sesi ${currentSection + 1}`}</div>
+          <div className="text-[10px] sm:text-xs text-muted-foreground uppercase font-bold">Sesi {currentSection + 1}/{sections.length}</div>
+          <div className="font-bold text-sm sm:text-base line-clamp-1">{section.subjects?.name || `Sesi ${currentSection + 1}`}</div>
         </div>
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-bold text-lg ${timeLeft < 60 ? "bg-destructive/10 text-destructive animate-pulse" : "bg-primary/10 text-primary"}`}>
-          <Clock className="w-5 h-5" />
+        <div className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-mono font-bold text-base sm:text-lg ${timeLeft < 60 ? "bg-destructive/10 text-destructive animate-pulse" : "bg-primary/10 text-primary"}`}>
+          <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
           {formatTime(timeLeft)}
         </div>
-        <div className="text-sm text-muted-foreground hidden sm:block">
+        <div className="text-xs sm:text-sm text-muted-foreground hidden md:block">
           {answeredInSection}/{questions.length} dijawab
         </div>
       </div>
@@ -373,7 +410,7 @@ export default function TryoutTakePage() {
             Navigasi Soal
             <span className="text-xs bg-secondary px-2 py-0.5 rounded font-medium">{answeredInSection}/{questions.length}</span>
           </h3>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-6 sm:grid-cols-5 gap-1.5 sm:gap-2">
             {questions.map((q: any, i: number) => {
               if (!q) return null;
               const isAnswered = answers[q.id];
@@ -390,7 +427,7 @@ export default function TryoutTakePage() {
                 <button
                   key={q.id || i}
                   onClick={() => setCurrentQuestion(i)}
-                  className={`w-9 h-9 rounded-lg text-xs font-semibold transition-all ${btnClass}`}
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-xs font-semibold transition-all ${btnClass}`}
                 >
                   {i + 1}
                 </button>

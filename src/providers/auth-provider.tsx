@@ -131,14 +131,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      setUser(null);
-      setProfile(null);
+      console.log("Signing out...");
+      // 1. First, try to call Supabase signOut
       await supabase.auth.signOut();
     } catch (err) {
-      console.error("Logout error:", err);
+      console.error("Supabase signOut error:", err);
     } finally {
-      // Always clear state and redirect
-      localStorage.removeItem("supabase.auth.token"); // Extra safety
+      // 2. Always clear local state regardless of Supabase response
+      setUser(null);
+      setProfile(null);
+      
+      // 3. Clear all potential storage keys
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // 4. Force hard redirect to login to ensure fresh start
       window.location.href = "/login";
     }
   };
