@@ -30,6 +30,7 @@ const navItems = [
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
   const router = useRouter();
   const { profile, user, signOut, loading } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
