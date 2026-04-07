@@ -16,19 +16,17 @@ export async function POST(request: Request) {
     let extractedText = "";
     if (fileUrl) {
       try {
-        // Only require pdf-parse when we actually need it (lazy load)
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const pdfParse = require("pdf-parse");
-        const fileResponse = await fetch(fileUrl);
+        const fileResponse = await fetch(fileUrl, { signal: AbortSignal.timeout(5000) });
         if (fileResponse.ok) {
           const arrayBuffer = await fileResponse.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
           const pdfData = await pdfParse(buffer);
-          extractedText = pdfData.text.slice(0, 15000);
+          extractedText = pdfData.text.slice(0, 10000);
         }
       } catch (err) {
-        console.error("Failed to parse PDF:", err);
-        // Continue without PDF text — don't crash the entire request
+        console.error("Failed to parse PDF in serverless route:", err);
       }
     }
 

@@ -271,7 +271,15 @@ export default function DashboardPage() {
           </h2>
           <div className="space-y-4">
             {subjectProgress.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Belum ada data latihan soal. Yuk mulai kerjakan bank soal!</p>
+              <div className="text-center py-6">
+                 <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Target className="w-6 h-6 text-muted-foreground opacity-30" />
+                 </div>
+                 <p className="text-xs text-muted-foreground max-w-[180px] mx-auto">
+                    Belum ada data latihan. Kerjakan satu subtes di Bank Soal untuk melihat progres belajarmu!
+                 </p>
+                 <Link href="/bank-soal" className="text-xs font-bold text-primary mt-3 inline-block hover:underline">Mulai Sekarang →</Link>
+              </div>
             ) : (
               subjectProgress.map((subject, i) => (
                  <div key={subject.id || i}>
