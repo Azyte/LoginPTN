@@ -101,7 +101,9 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
   };
 
   useEffect(() => {
-    const channel = supabase.channel(`voice-${roomId}`, {
+    if (!roomId || !userId) return;
+
+    const channel = supabase.channel(`group-voice-${roomId}`, {
       config: {
         broadcast: { ack: false, self: false },
         presence: { key: userId }
@@ -109,10 +111,11 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
     });
     channelRef.current = channel;
 
-    // Presence Sync — filter out blacklisted (left) users
+    // Presence Sync
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState();
       const users: Record<string, { name: string, isMuted: boolean }> = {};
+      
       for (const [id, presences] of Object.entries(state)) {
         if (id !== userId && presences.length > 0 && !leftUsersRef.current.has(id)) {
           users[id] = (presences[0] as unknown) as { name: string, isMuted: boolean };
@@ -120,6 +123,9 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
       }
       setOnlineUsers(users);
     });
+    
+    // ... (rest of the broadcast handling is similar, but I'll ensure it stays stable)
+    // Signaling Logic follows...
 
     // WebRTC Signaling
     channel.on('broadcast', { event: 'webrtc_signal' }, async ({ payload }) => {

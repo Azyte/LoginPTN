@@ -36,11 +36,11 @@ export default function StudyGroupRoom() {
     leaveVoiceChannel
   } = useWebRTC(id as string, user?.id || "", profile?.name || "Anon", supabase);
 
-  // Load Group Info and Initial Messages
+  // 1. Initial Data Loading (One-shot)
   useEffect(() => {
     if (!user) return;
     
-    const loadGroupData = async () => {
+    const loadData = async () => {
       // Get Group
       const { data: g } = await supabase.from("study_groups").select("*").eq("id", id).single();
       if (!g) {
@@ -57,7 +57,6 @@ export default function StudyGroupRoom() {
         .eq("group_id", id)
         .order("created_at", { ascending: true })
         .limit(100);
-        
       if (m) setMessages(m);
 
       // Get Members
@@ -65,31 +64,51 @@ export default function StudyGroupRoom() {
         .from("group_members")
         .select("role, joined_at, profiles:user_id(id, name, avatar_url, target_university_id)")
         .eq("group_id", id);
-      
       if (mem) setMembers(mem);
 
       setLoading(false);
     };
 
-    loadGroupData();
+    loadData();
+  }, [id, user, supabase, router]); // NO members dependency here
 
-    // Subscribe to new text messages
+  // 2. Real-time Subscription (Stable)
+  useEffect(() => {
+    if (!user || !id) return;
+
     const channel = supabase.channel(`group-chat-${id}`)
       .on('postgres_changes', { 
         event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${id}` 
       }, async (payload) => {
-        // Avoid duplicates if we already added it optimistically
+        // Skip our own message if already added optimistically
+        if (payload.new.user_id === user.id) return;
+        
         setMessages(prev => {
           if (prev.some(m => m.id === payload.new.id)) return prev;
           
-          // Find sender info from members list instead of re-fetching from DB
-          const sender = members.find(m => m.profiles.id === payload.new.user_id);
+          // Placeholder message structure
           const newMsg = { 
             ...payload.new, 
-            profiles: sender?.profiles || { name: "Loading...", avatar_url: null } 
+            profiles: { name: "Pengirim...", avatar_url: null } 
           };
           
-          // If profile not in members yet (rare), we could fetch here, but let's try to find it
+          // Try to resolve profile from members or fetch
+          const knownMember = members.find(m => m.profiles.id === payload.new.user_id);
+          if (knownMember) {
+            newMsg.profiles = knownMember.profiles;
+          } else {
+            // Lazy load profile info if sender is new/unknown
+            supabase.from("profiles")
+              .select("name, avatar_url")
+              .eq("id", payload.new.user_id)
+              .single()
+              .then(({ data }) => {
+                if (data) {
+                  setMessages(current => current.map(m => m.id === payload.new.id ? { ...m, profiles: data } : m));
+                }
+              });
+          }
+          
           return [...prev, newMsg];
         });
       })
@@ -97,9 +116,8 @@ export default function StudyGroupRoom() {
 
     return () => {
       channel.unsubscribe();
-      if (isVoiceConnected) leaveVoiceChannel();
     };
-  }, [id, user, supabase, router, members]); // Added members to deps
+  }, [id, user?.id, supabase, members]); // members included carefully here, but callback handles it
 
   // ... (existing code)
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 import {
@@ -30,18 +30,29 @@ const navItems = [
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const pathname = usePathname();
+  const router = useRouter();
   const { profile, user, signOut, loading } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [loading, user, router]);
+
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 rounded-xl animated-gradient flex items-center justify-center">
-            <GraduationCap className="w-6 h-6 text-white" />
+          <div className="w-12 h-12 rounded-2xl animated-gradient flex items-center justify-center shadow-lg shadow-primary/20">
+            <GraduationCap className="w-7 h-7 text-white" />
           </div>
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center">
+            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="mt-4 text-sm font-medium text-muted-foreground animate-pulse text-center">
+              {!user && !loading ? "Sesi Berakhir. Mengalihkan..." : "Menyiapkan Ruang Belajarmu..."}
+            </p>
+          </div>
         </div>
       </div>
     );

@@ -95,8 +95,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const getUser = async () => {
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const { data: { user: authUser }, error } = await supabase.auth.getUser();
         if (!isMounted) return;
+        
+        if (error) {
+          console.error("Auth error:", error.message);
+          // If error is about invalid JWT or invalid session, clear it locally
+          if (error.status === 401 || error.status === 403 || error.message.includes("JWT")) {
+            console.warn("Session invalid — clearing local state");
+            setUser(null);
+            setProfile(null);
+          }
+        }
+        
         setUser(authUser);
         if (authUser) {
           await fetchProfile(authUser);
@@ -104,7 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error("Error getting user:", err);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+        }
       }
     };
     getUser();
@@ -145,8 +159,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.clear();
       sessionStorage.clear();
       
-      // 4. Force hard redirect to login to ensure fresh start
-      window.location.href = "/login";
+      // 4. Force hard redirect to landing page as requested
+      window.location.href = "/";
     }
   };
 
