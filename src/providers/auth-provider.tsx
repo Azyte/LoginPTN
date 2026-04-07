@@ -99,11 +99,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
+          const optimisticProfile = buildFallbackProfile(session.user);
           setUser(session.user);
+          setProfile(optimisticProfile); // IMMEDIATELY show the name from metadata
+          
           // Set loading false early if we have a user (Optimistic)
           setLoading(false);
           clearTimeout(safetyTimeout);
-          // Fetch profile in background
+          // Fetch the real, detailed profile in background
           fetchProfile(session.user);
         } else {
           // If no session, do the formal getUser check (Network)

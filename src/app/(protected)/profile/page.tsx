@@ -18,7 +18,8 @@ export default function ProfilePage() {
 
   const [stats, setStats] = useState({ answered: 0, tryouts: 0, streak: 0 });
   const [earnedBadges, setEarnedBadges] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingBadges, setLoadingBadges] = useState(true);
 
   // Edit form state
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -39,7 +40,17 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!user) { setLoading(false); return; }
+      if (!user) { 
+        setLoadingStats(false); 
+        setLoadingBadges(false);
+        return; 
+      }
+
+      // Add a safety timeout for count queries (sometimes slow)
+      const timeout = setTimeout(() => {
+        setLoadingStats(false);
+        setLoadingBadges(false);
+      }, 7000);
 
       try {
         const [
@@ -64,7 +75,9 @@ export default function ProfilePage() {
       } catch (err) {
         console.error("Error loading profile data:", err);
       } finally {
-        setLoading(false);
+        setLoadingStats(false);
+        setLoadingBadges(false);
+        clearTimeout(timeout);
       }
     }
     loadData();
@@ -196,21 +209,26 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div className="bg-card border border-border/50 rounded-2xl p-6 text-center card-hover overflow-hidden relative">
           <div className="absolute right-0 top-0 w-24 h-24 bg-primary/5 rounded-full -mr-8 -mt-8" />
-          <div className="text-3xl font-bold text-primary mb-1">{loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : stats.answered}</div>
+          <div className="text-3xl font-bold text-primary mb-1">
+            {loadingStats ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : stats.answered}
+          </div>
           <div className="text-sm text-muted-foreground font-medium">Soal Dijawab</div>
         </div>
         <div className="bg-card border border-border/50 rounded-2xl p-6 text-center card-hover overflow-hidden relative">
           <div className="absolute right-0 top-0 w-24 h-24 bg-purple-500/5 rounded-full -mr-8 -mt-8" />
-          <div className="text-3xl font-bold text-purple-500 mb-1">{loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : stats.tryouts}</div>
+          <div className="text-3xl font-bold text-purple-500 mb-1">
+            {loadingStats ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : stats.tryouts}
+          </div>
           <div className="text-sm text-muted-foreground font-medium">Tryout Selesai</div>
         </div>
         <div className="bg-card border border-border/50 rounded-2xl p-6 text-center card-hover overflow-hidden relative col-span-2 md:col-span-1">
           <div className="absolute right-0 top-0 w-24 h-24 bg-orange-500/5 rounded-full -mr-8 -mt-8" />
-          <div className="text-3xl font-bold text-orange-500 mb-1">{loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : stats.streak}</div>
+          <div className="text-3xl font-bold text-orange-500 mb-1">
+            {loadingStats ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : stats.streak}
+          </div>
           <div className="text-sm text-muted-foreground font-medium">Hari Streak</div>
         </div>
       </div>
@@ -218,7 +236,7 @@ export default function ProfilePage() {
       {/* Badges */}
       <div className="bg-card border border-border/50 rounded-2xl p-6">
         <h2 className="text-lg font-semibold mb-6 flex items-center gap-2"><Trophy className="w-5 h-5 text-warning" /> Badge Peringkat & Prestasi</h2>
-        {loading ? (
+        {loadingBadges ? (
           <div className="flex items-center justify-center py-10">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
