@@ -56,7 +56,9 @@ export function MultiplayerGameModal({ roomId, user, onClose }: MultiplayerGameM
   const [textInput, setTextInput] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const channel = useMemo(() => supabase.channel(`game-${roomId}`), [supabase, roomId]);
+  const channel = useMemo(() => supabase.channel(`game-${roomId}`, {
+    config: { broadcast: { self: true } }
+  }), [supabase, roomId]);
 
   const MAX_ROUNDS = 5;
 
@@ -163,6 +165,7 @@ export function MultiplayerGameModal({ roomId, user, onClose }: MultiplayerGameM
   const handleStartGame = () => {
     const payload = generateGameData(selectedMode);
     channel.send({ type: "broadcast", event: "start-game", payload });
+    // Since we're using self: true, the listener on line 98 will trigger for host too
   };
 
   const processAnswer = (isCorrect: boolean) => {

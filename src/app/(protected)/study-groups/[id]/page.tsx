@@ -24,6 +24,8 @@ export default function StudyGroupRoom() {
   const [showTrivia, setShowTrivia] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const membersRef = useRef<any[]>([]);
+  const [connStatus, setConnStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
 
   const {
     localStream,
@@ -64,62 +66,90 @@ export default function StudyGroupRoom() {
         .from("group_members")
         .select("role, joined_at, profiles:user_id(id, name, avatar_url, target_university_id)")
         .eq("group_id", id);
-      if (mem) setMembers(mem);
+      if (mem) {
+        setMembers(mem);
+        membersRef.current = mem;
+      }
 
       setLoading(false);
     };
 
     loadData();
-  }, [id, user, supabase, router]); // NO members dependency here
+  }, [id, user, supabase, router]); 
 
-  // 2. Real-time Subscription (Stable)
+  // 2. Real-time Subscription (Stable - NO CHURN)
   useEffect(() => {
     if (!user || !id) return;
+
+    // Persist members in ref for the callback closure
+    membersRef.current = members;
 
     const channel = supabase.channel(`group-chat-${id}`)
       .on('postgres_changes', { 
         event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${id}` 
       }, async (payload) => {
-        // Skip our own message if already added optimistically
         if (payload.new.user_id === user.id) return;
         
         setMessages(prev => {
           if (prev.some(m => m.id === payload.new.id)) return prev;
           
-          // Placeholder message structure
-          const newMsg = { 
-            ...payload.new, 
-            profiles: { name: "Pengirim...", avatar_url: null } 
-          };
+          const newMsg = { ...payload.new, profiles: { name: "Pengetik...", avatar_url: null } };
           
-          // Try to resolve profile from members or fetch
-          const knownMember = members.find(m => m.profiles.id === payload.new.user_id);
+          // Use the Ref instead of the state to avoid stale closure or dependency-loop
+          const knownMember = membersRef.current.find(m => m.profiles.id === payload.new.user_id);
           if (knownMember) {
             newMsg.profiles = knownMember.profiles;
           } else {
-            // Lazy load profile info if sender is new/unknown
-            supabase.from("profiles")
-              .select("name, avatar_url")
-              .eq("id", payload.new.user_id)
-              .single()
-              .then(({ data }) => {
-                if (data) {
-                  setMessages(current => current.map(m => m.id === payload.new.id ? { ...m, profiles: data } : m));
-                }
-              });
+            supabase.from("profiles").select("name, avatar_url").eq("id", payload.new.user_id).single().then(({ data }) => {
+              if (data) setMessages(curr => curr.map(m => m.id === payload.new.id ? { ...m, profiles: data } : m));
+            });
           }
-          
           return [...prev, newMsg];
         });
       })
-      .subscribe();
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          setConnStatus("connected");
+          // Re-fetch last 10 messages to catch gaps during reconnect
+          const { data } = await supabase
+            .from("group_messages")
+            .select("*, profiles:user_id(name, avatar_url)")
+            .eq("group_id", id)
+            .order("created_at", { ascending: false })
+            .limit(20);
+          
+          if (data) {
+             setMessages(prev => {
+                const existingIds = new Set(prev.map(m => m.id));
+                const newMsgs = data.reverse().filter(m => !existingIds.has(m.id));
+                return [...prev, ...newMsgs];
+             });
+          }
+        }
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setConnStatus("disconnected");
+      });
 
     return () => {
       channel.unsubscribe();
     };
-  }, [id, user?.id, supabase, members]); // members included carefully here, but callback handles it
+  }, [id, user?.id, supabase]); // Removed 'members' to prevent churn
 
   // ... (existing code)
+
+  const handleDeleteGroup = async () => {
+    if (!group || group.owner_id !== user?.id) return;
+    
+    if (!confirm("Apakah Anda yakin ingin menghapus grup ini? Semua pesan akan hilang selamanya.")) return;
+    
+    try {
+      const { error } = await supabase.from("study_groups").delete().eq("id", id);
+      if (error) throw error;
+      router.push("/study-groups");
+    } catch (err) {
+      console.error("Gagal menghapus grup:", err);
+      alert("Gagal menghapus grup. Silakan coba lagi.");
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -325,7 +355,12 @@ export default function StudyGroupRoom() {
               <MessageCircle className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold">Selamat datang di {group?.name}!</h2>
-            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Ini adalah awal dari diskusi teks. Bagikan pertanyaan, materi TPS/SosTeks/SainTek, atau bahas soal di sini.</p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+               <div className={`w-2 h-2 rounded-full ${connStatus === 'connected' ? 'bg-green-500' : 'bg-destructive animate-pulse'}`} />
+               <span className="text-xs font-medium text-muted-foreground">
+                  {connStatus === 'connected' ? 'Terhubung' : 'Terputus - Menyambungkan...'}
+               </span>
+            </div>
           </div>
 
           {messages.map((m, idx) => {
@@ -474,6 +509,10 @@ function AudioPlayer({ stream }: { stream: MediaStream }) {
   useEffect(() => {
     if (audioRef.current && stream) {
       audioRef.current.srcObject = stream;
+      // Force play handles autoplay policies in many browsers
+      audioRef.current.play().catch(e => {
+        console.warn("Autoplay was blocked, user needs to interact first:", e);
+      });
     }
   }, [stream]);
 

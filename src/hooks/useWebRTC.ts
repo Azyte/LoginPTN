@@ -21,8 +21,10 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
   const rtcConfig = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:global.stun.twilio.com:3478" }
-    ]
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:stun2.l.google.com:19302" }
+    ],
+    iceCandidatePoolSize: 10
   };
 
   const cleanup = useCallback(() => {
@@ -46,13 +48,17 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
   }, []);
 
   const createPeerConnection = (targetUserId: string, targetName: string) => {
-    // If there's an existing stale peer, close it first
+    // If there's an existing stale peer, preserve it if connected
     if (peersRef.current[targetUserId]) {
-      try { peersRef.current[targetUserId].close(); } catch { /* ignore */ }
-      delete peersRef.current[targetUserId];
+       if (peersRef.current[targetUserId].connectionState === 'connected') {
+         return peersRef.current[targetUserId];
+       }
+       peersRef.current[targetUserId].close();
+       delete peersRef.current[targetUserId];
     }
 
     const peer = new RTCPeerConnection(rtcConfig);
+    const isPolite = userId < targetUserId; // Deterministic politeness
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
@@ -63,40 +69,33 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
     peer.onicecandidate = (event) => {
       if (event.candidate) {
         channelRef.current?.send({
-          type: "broadcast",
-          event: "webrtc_signal",
-          payload: {
-            target: targetUserId,
-            sender: userId,
-            senderName: userName,
-            signal: { type: "ice", candidate: event.candidate }
+          type: "broadcast", event: "webrtc_signal",
+          payload: { 
+            target: targetUserId, sender: userId, senderName: userName, 
+            signal: { type: "ice", candidate: event.candidate } 
           }
         });
       }
     };
 
     peer.ontrack = (event) => {
-      let stream = event.streams[0];
-      if (!stream) {
-        stream = new MediaStream();
-        stream.addTrack(event.track);
+      const stream = event.streams[0];
+      if (stream) {
+        setRemoteStreams(prev => ({
+          ...prev, [targetUserId]: { stream, name: targetName }
+        }));
       }
-      setRemoteStreams(prev => ({
-        ...prev,
-        [targetUserId]: { stream, name: targetName }
-      }));
+    };
+
+    // Auto-reconnect on failure
+    peer.onconnectionstatechange = () => {
+       if (peer.connectionState === 'failed') {
+         console.warn("Koneksi gagal, mencoba menyambung ulang...");
+         peer.restartIce();
+       }
     };
 
     peersRef.current[targetUserId] = peer;
-
-    // Flush any queued ICE candidates
-    if (pendingCandidates.current[targetUserId]) {
-      pendingCandidates.current[targetUserId].forEach(c => {
-        peer.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
-      });
-      delete pendingCandidates.current[targetUserId];
-    }
-
     return peer;
   };
 
@@ -132,68 +131,83 @@ export function useWebRTC(roomId: string, userId: string, userName: string, supa
       if (payload.target && payload.target !== userId) return;
 
       const { sender, senderName, signal } = payload;
+      const isPolite = userId < sender; // Am I the polite one?
 
-      if (signal.type === "hello") {
-        // User is (re)joining — remove from blacklist
-        leftUsersRef.current.delete(sender);
-        
-        const peer = createPeerConnection(sender, senderName);
-        const offer = await peer.createOffer();
-        await peer.setLocalDescription(offer);
+      try {
+        if (signal.type === "hello") {
+          leftUsersRef.current.delete(sender);
+          const peer = createPeerConnection(sender, senderName);
+          
+          // Only the impolite one (or determined by logic) starts the offer to avoid glare
+          if (!isPolite) {
+            const offer = await peer.createOffer();
+            await peer.setLocalDescription(offer);
+            channel.send({
+              type: "broadcast", event: "webrtc_signal",
+              payload: { target: sender, sender: userId, senderName: userName, signal: { type: "offer", description: peer.localDescription } }
+            });
+          }
+        }
+        else if (signal.type === "offer") {
+          const peer = createPeerConnection(sender, senderName);
+          const readyForOffer = !isPolite || peer.signalingState === "stable";
+          
+          if (!readyForOffer && (peer.signalingState as any) !== "stable") {
+             // Rollback for polite peer
+             await peer.setLocalDescription({ type: "rollback" });
+          }
 
-        channel.send({
-          type: "broadcast", event: "webrtc_signal",
-          payload: { target: sender, sender: userId, senderName: userName, signal: { type: "offer", description: peer.localDescription } }
-        });
-      }
-      else if (signal.type === "offer") {
-        leftUsersRef.current.delete(sender);
-        
-        const peer = createPeerConnection(sender, senderName);
-        await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
-        const answer = await peer.createAnswer();
-        await peer.setLocalDescription(answer);
-
-        channel.send({
-          type: "broadcast", event: "webrtc_signal",
-          payload: { target: sender, sender: userId, senderName: userName, signal: { type: "answer", description: peer.localDescription } }
-        });
-      }
-      else if (signal.type === "answer") {
-        const peer = peersRef.current[sender];
-        if (peer) {
           await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
-        }
-      }
-      else if (signal.type === "ice") {
-        const peer = peersRef.current[sender];
-        if (peer && peer.remoteDescription) {
-          peer.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(() => {});
-        } else {
-          if (!pendingCandidates.current[sender]) pendingCandidates.current[sender] = [];
-          pendingCandidates.current[sender].push(signal.candidate);
-        }
-      }
-      else if (signal.type === "leave") {
-        // Blacklist this user so presence sync can't resurrect them
-        leftUsersRef.current.add(sender);
+          const answer = await peer.createAnswer();
+          await peer.setLocalDescription(answer);
 
-        if (peersRef.current[sender]) {
-          peersRef.current[sender].close();
-          delete peersRef.current[sender];
+          channel.send({
+            type: "broadcast", event: "webrtc_signal",
+            payload: { target: sender, sender: userId, senderName: userName, signal: { type: "answer", description: peer.localDescription } }
+          });
         }
-        delete pendingCandidates.current[sender];
+        else if (signal.type === "answer") {
+          const peer = peersRef.current[sender];
+          if (peer && peer.signalingState !== "stable") {
+            await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
+          }
+        }
+        else if (signal.type === "ice") {
+          const peer = peersRef.current[sender];
+          if (peer) {
+            try {
+              await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            } catch (e) {
+              if (!peer.remoteDescription) {
+                if (!pendingCandidates.current[sender]) pendingCandidates.current[sender] = [];
+                pendingCandidates.current[sender].push(signal.candidate);
+              }
+            }
+          }
+        }
+        else if (signal.type === "leave") {
+          // Blacklist this user so presence sync can't resurrect them
+          leftUsersRef.current.add(sender);
 
-        setRemoteStreams(prev => {
-          const next = { ...prev };
-          delete next[sender];
-          return next;
-        });
-        setOnlineUsers(prev => {
-          const next = { ...prev };
-          delete next[sender];
-          return next;
-        });
+          if (peersRef.current[sender]) {
+            peersRef.current[sender].close();
+            delete peersRef.current[sender];
+          }
+          delete pendingCandidates.current[sender];
+
+          setRemoteStreams(prev => {
+            const next = { ...prev };
+            delete next[sender];
+            return next;
+          });
+          setOnlineUsers(prev => {
+            const next = { ...prev };
+            delete next[sender];
+            return next;
+          });
+        }
+      } catch (err) {
+        console.error("WebRTC Signaling Error:", err);
       }
     });
 
