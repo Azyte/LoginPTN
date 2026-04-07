@@ -76,29 +76,32 @@ export default function TryoutTakePage() {
               const q = tq.questions;
               if (!q) return null;
               
-              // Extract correct answer key BEFORE stripping it
-              let correctKey = "";
-              try {
-                if (typeof q.correct_answer === 'object' && q.correct_answer !== null) {
-                  correctKey = q.correct_answer.key || String(q.correct_answer);
+              const parsedOptions = Array.isArray(q.options) ? q.options.map((o: any, i: number) => {
+                const text = (typeof o === 'string' ? o : String(o?.text || '')).replace(/\(kunci jawaban\)/gi, "").trim();
+                return { key: o?.key || String.fromCharCode(65 + i), text };
+              }) : [];
+
+              let correctKey = "A";
+              if (q.correct_answer) {
+                if (typeof q.correct_answer === 'object' && q.correct_answer !== null && q.correct_answer.key) {
+                  correctKey = q.correct_answer.key;
                 } else if (typeof q.correct_answer === 'string') {
-                  try {
-                    const parsed = JSON.parse(q.correct_answer);
-                    correctKey = parsed.key || String(parsed);
-                  } catch {
-                    correctKey = String(q.correct_answer).replace(/[\`'"/]/g, "");
+                  const match = parsedOptions.find((o: any) => o.text.toLowerCase() === q.correct_answer.replace(/\(kunci jawaban\)/gi, "").trim().toLowerCase());
+                  if (match) {
+                    correctKey = match.key;
+                  } else if (/^[A-E]$/i.test(q.correct_answer.trim())) {
+                    correctKey = q.correct_answer.trim().toUpperCase();
                   }
                 }
-              } catch {
-                correctKey = String(q.correct_answer || "").replace(/[\`'"/]/g, "");
               }
+              
               answerMap[q.id] = correctKey;
               
               // Return question WITHOUT correct_answer and explanation
               return {
                 id: q.id,
                 content: q.content,
-                options: q.options,
+                options: parsedOptions.map((o: any) => ({ key: o.key, text: o.text })),
                 difficulty: q.difficulty,
                 type: q.type,
               };
@@ -165,47 +168,63 @@ export default function TryoutTakePage() {
     }
   };
 
+  const [isFinishing, setIsFinishing] = useState(false);
+
   const handleFinish = async () => {
-    if (!attemptId) return;
+    if (!attemptId || isFinishing) return;
+    setIsFinishing(true);
     setShowConfirm(false);
     
-    let correctCount = 0;
-    let totalQuestions = 0;
-    const answersToInsert: any[] = [];
+    try {
+      let correctCount = 0;
+      let totalQuestions = 0;
+      const answersToInsert: any[] = [];
 
-    sections.forEach(sec => {
-      sec.questions.forEach((q: any) => {
-        if (!q) return;
-        totalQuestions++;
-        const userAnswer = answers[q.id];
-        const correctKey = correctAnswerMap[q.id] || "";
-        
-        const isCorrect = userAnswer === correctKey;
-        if (isCorrect) correctCount++;
+      sections.forEach(sec => {
+        sec.questions.forEach((q: any) => {
+          if (!q) return;
+          totalQuestions++;
+          const userAnswer = answers[q.id];
+          const correctKey = correctAnswerMap[q.id] || "";
+          
+          const isCorrect = userAnswer === correctKey;
+          if (isCorrect) correctCount++;
 
-        answersToInsert.push({
-          attempt_id: attemptId,
-          question_id: q.id,
-          section_id: sec.id,
-          answer: userAnswer ? { key: userAnswer } : null,
-          is_correct: isCorrect
+          answersToInsert.push({
+            attempt_id: attemptId,
+            question_id: q.id,
+            section_id: sec.id,
+            answer: userAnswer ? { key: userAnswer } : null,
+            is_correct: isCorrect
+          });
         });
       });
-    });
 
-    const totalScore = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 1000) : 0;
+      const totalScore = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 1000) : 0;
 
-    await supabase.from("tryout_attempts").update({
-      status: "completed",
-      finished_at: new Date().toISOString(),
-      total_score: totalScore
-    }).eq("id", attemptId);
+      // Update attempt status
+      const { error: updateError } = await supabase.from("tryout_attempts").update({
+        status: "completed",
+        finished_at: new Date().toISOString(),
+        total_score: totalScore
+      }).eq("id", attemptId);
 
-    if (answersToInsert.length > 0) {
-      await supabase.from("tryout_answers").insert(answersToInsert);
+      if (updateError) throw updateError;
+
+      // Insert answers
+      if (answersToInsert.length > 0) {
+        const { error: insertError } = await supabase.from("tryout_answers").insert(answersToInsert);
+        if (insertError) throw insertError;
+      }
+
+      // Success! Navigate to result
+      router.push(`/tryout/result/${attemptId}`);
+    } catch (err) {
+      console.error("Error finishing tryout:", err);
+      alert("Terjadi kesalahan saat menyimpan jawaban. Silakan coba klik tombol selesai kembali.");
+    } finally {
+      setIsFinishing(false);
     }
-
-    router.push(`/tryout/result/${attemptId}`);
   };
 
   const formatTime = (seconds: number) => {
@@ -286,7 +305,7 @@ export default function TryoutTakePage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_250px] gap-6">
+      <div className="flex flex-col-reverse lg:grid lg:grid-cols-[1fr_250px] gap-6">
         {/* Question Area */}
         <div className="bg-card border border-border/50 rounded-2xl p-6 shadow-sm">
           {!question ? (
@@ -310,7 +329,7 @@ export default function TryoutTakePage() {
                       <span className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 ${
                         answers[question.id] === key ? "border-primary text-primary bg-background" : "border-border text-muted-foreground bg-secondary/50"
                       }`}>{key}</span>
-                      <span className="text-sm leading-relaxed mt-1 flex-1">{text}</span>
+                      <span className="text-sm leading-relaxed mt-1 flex-1 break-words">{text}</span>
                     </button>
                   );
                 })}
@@ -328,8 +347,13 @@ export default function TryoutTakePage() {
               <ChevronLeft className="w-4 h-4" /> Sebelumnya
             </button>
             {currentQuestion >= questions.length - 1 ? (
-              <button onClick={() => setShowConfirm(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 shadow-sm">
-                <Flag className="w-4 h-4" /> {currentSection === sections.length - 1 ? "Selesaikan Tryout" : "Selesaikan Sesi"}
+              <button 
+                onClick={() => setShowConfirm(true)} 
+                disabled={isFinishing}
+                className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 shadow-sm disabled:opacity-50"
+              >
+                {isFinishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flag className="w-4 h-4" />} 
+                {currentSection === sections.length - 1 ? "Selesaikan Tryout" : "Selesaikan Sesi"}
               </button>
             ) : (
               <button
@@ -397,11 +421,19 @@ export default function TryoutTakePage() {
               Yakin ingin melanjutkan?
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setShowConfirm(false)} className="flex-1 bg-secondary hover:bg-secondary/80 text-foreground py-2.5 rounded-xl font-medium transition-colors">Batal</button>
-              <button
-                onClick={handleNextSection}
-                className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-xl font-semibold shadow-md shadow-primary/20 hover:opacity-90 transition-all"
+              <button 
+                onClick={() => setShowConfirm(false)} 
+                disabled={isFinishing}
+                className="flex-1 bg-secondary hover:bg-secondary/80 text-foreground py-2.5 rounded-xl font-medium transition-colors disabled:opacity-50"
               >
+                Batal
+              </button>
+              <button
+                onClick={handleFinish}
+                disabled={isFinishing}
+                className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-xl font-semibold shadow-md shadow-primary/20 hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isFinishing && <Loader2 className="w-4 h-4 animate-spin" />}
                 Selesaikan
               </button>
             </div>

@@ -130,10 +130,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    window.location.href = "/login";
+    try {
+      setUser(null);
+      setProfile(null);
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Logout error:", err);
+    } finally {
+      // Always clear state and redirect
+      localStorage.removeItem("supabase.auth.token"); // Extra safety
+      window.location.href = "/login";
+    }
   };
 
   return (

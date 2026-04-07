@@ -48,6 +48,13 @@ export default function BankSoalPage() {
       if (q.correct_answer) {
         if (typeof q.correct_answer === 'object' && q.correct_answer !== null && q.correct_answer.key) {
           correctKey = q.correct_answer.key;
+        } else if (typeof q.correct_answer === 'string') {
+          const match = mappedOps.find((o: any) => o.text.trim().toLowerCase() === q.correct_answer.replace(/\(kunci jawaban\)/gi, "").trim().toLowerCase());
+          if (match) {
+            correctKey = match.key;
+          } else if (/^[A-E]$/i.test(q.correct_answer.trim())) {
+            correctKey = q.correct_answer.trim().toUpperCase();
+          }
         }
       }
 
@@ -344,7 +351,7 @@ export default function BankSoalPage() {
                            isRevealed && isSelected && !isCorrectOpt ? <XCircle className="w-3.5 h-3.5" /> :
                            opt.key}
                         </span>
-                        <span className="text-sm pt-0.5 whitespace-pre-wrap">{opt.text}</span>
+                        <span className="text-sm pt-0.5 whitespace-pre-wrap flex-1 break-words leading-relaxed">{opt.text}</span>
                       </button>
                     );
                   })}

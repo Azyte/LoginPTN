@@ -27,91 +27,106 @@ export default function LeaderboardPage() {
   useEffect(() => {
     async function fetchLeaderboard() {
       setLoading(true);
+      console.log("Fetching leaderboard data for tab:", tab);
 
-      // Bank Soal Leaderboard: count correct answers per user
-      const { data: bankSoalRaw } = await supabase
-        .from("user_answers")
-        .select("user_id, is_correct, profiles(name, avatar_url, school)")
-        .eq("is_correct", true);
+      try {
+        // Bank Soal Leaderboard
+        const { data: bankSoalRaw, error: bankSoalError } = await supabase
+          .from("user_answers")
+          .select("user_id, is_correct, profiles(name, avatar_url, school)")
+          .eq("is_correct", true);
 
-      if (bankSoalRaw) {
-        const userMap: Record<string, LeaderboardEntry> = {};
-        bankSoalRaw.forEach((row: any) => {
-          const uid = row.user_id;
-          if (!userMap[uid]) {
-            const profile = row.profiles;
-            userMap[uid] = {
-              user_id: uid,
-              name: profile?.name || "Anonim",
-              avatar_url: profile?.avatar_url || null,
-              school: profile?.school || null,
-              score: 0,
-              extra: "",
-            };
-          }
-          userMap[uid].score += 1;
-        });
+        if (bankSoalError) {
+          console.error("Bank Soal Fetch Error:", bankSoalError);
+        }
 
-        const sorted = Object.values(userMap).sort((a, b) => b.score - a.score).slice(0, 50);
-        sorted.forEach((e) => (e.extra = `${e.score} soal benar`));
-        setBankSoalData(sorted);
+        if (bankSoalRaw) {
+          console.log("Fetched bank soal answers count:", bankSoalRaw.length);
+          const userMap: Record<string, LeaderboardEntry> = {};
+          bankSoalRaw.forEach((row: any) => {
+            const uid = row.user_id;
+            if (!userMap[uid]) {
+              const profile = row.profiles;
+              userMap[uid] = {
+                user_id: uid,
+                name: profile?.name || "Anonim",
+                avatar_url: profile?.avatar_url || null,
+                school: profile?.school || null,
+                score: 0,
+                extra: "",
+              };
+            }
+            userMap[uid].score += 1;
+          });
+
+          const sorted = Object.values(userMap).sort((a, b) => b.score - a.score).slice(0, 50);
+          sorted.forEach((e) => (e.extra = `${e.score} soal benar`));
+          setBankSoalData(sorted);
+        }
+
+        // Tryout Leaderboard
+        const { data: tryoutRaw, error: tryoutError } = await supabase
+          .from("tryout_attempts")
+          .select("user_id, total_score, profiles(name, avatar_url, school)")
+          .eq("status", "completed")
+          .not("total_score", "is", null)
+          .order("total_score", { ascending: false });
+
+        if (tryoutError) {
+          console.error("Tryout Fetch Error:", tryoutError);
+        }
+
+        if (tryoutRaw) {
+          console.log("Fetched tryout completed attempts count:", tryoutRaw.length);
+          const userMap: Record<string, LeaderboardEntry> = {};
+          tryoutRaw.forEach((row: any) => {
+            const uid = row.user_id;
+            const score = Number(row.total_score) || 0;
+            // Record only the highest score per user
+            if (!userMap[uid] || score > userMap[uid].score) {
+              const profile = row.profiles;
+              userMap[uid] = {
+                user_id: uid,
+                name: profile?.name || "Anonim",
+                avatar_url: profile?.avatar_url || null,
+                school: profile?.school || null,
+                score,
+                extra: `Skor: ${score.toFixed(1)}`,
+              };
+            }
+          });
+
+          const sorted = Object.values(userMap).sort((a, b) => b.score - a.score).slice(0, 50);
+          setTryoutData(sorted);
+        }
+      } catch (err) {
+        console.error("Unexpected error in fetchLeaderboard:", err);
+      } finally {
+        setLoading(false);
       }
-
-      // Tryout Leaderboard: best total_score per user
-      const { data: tryoutRaw } = await supabase
-        .from("tryout_attempts")
-        .select("user_id, total_score, profiles(name, avatar_url, school)")
-        .eq("status", "completed")
-        .not("total_score", "is", null)
-        .order("total_score", { ascending: false });
-
-      if (tryoutRaw) {
-        const userMap: Record<string, LeaderboardEntry> = {};
-        tryoutRaw.forEach((row: any) => {
-          const uid = row.user_id;
-          const score = Number(row.total_score) || 0;
-          if (!userMap[uid] || score > userMap[uid].score) {
-            const profile = row.profiles;
-            userMap[uid] = {
-              user_id: uid,
-              name: profile?.name || "Anonim",
-              avatar_url: profile?.avatar_url || null,
-              school: profile?.school || null,
-              score,
-              extra: `Skor: ${score.toFixed(1)}`,
-            };
-          }
-        });
-
-        const sorted = Object.values(userMap).sort((a, b) => b.score - a.score).slice(0, 50);
-        setTryoutData(sorted);
-      }
-
-      setLoading(false);
     }
 
     fetchLeaderboard();
 
     // Realtime subscription for live updates
-    const bankSoalSub = supabase
-      .channel("leaderboard-bank-soal")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "user_answers" }, () => {
+    const channel = supabase
+      .channel("leaderboard-updates")
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_answers" }, () => {
+        console.log("Realtime: user_answers changed");
         fetchLeaderboard();
       })
-      .subscribe();
-
-    const tryoutSub = supabase
-      .channel("leaderboard-tryout")
       .on("postgres_changes", { event: "*", schema: "public", table: "tryout_attempts" }, () => {
+        console.log("Realtime: tryout_attempts changed");
         fetchLeaderboard();
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
 
     return () => {
-      supabase.removeChannel(bankSoalSub);
-      supabase.removeChannel(tryoutSub);
+      supabase.removeChannel(channel);
     };
-  }, [supabase]);
+  }, [supabase, tab]);
 
   const currentData = tab === "bank-soal" ? bankSoalData : tryoutData;
   const podium = currentData.slice(0, 3);
