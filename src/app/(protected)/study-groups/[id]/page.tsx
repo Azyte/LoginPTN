@@ -203,33 +203,79 @@ export default function StudyGroupRoom() {
     if (!file || !user) return;
     
     setUploading(true);
+    const tempId = `temp-file-${Date.now()}`;
     const fileExt = file.name.split('.').pop();
-    const filePath = `${id}/${Math.random()}.${fileExt}`;
+    // Unique but identifiable name
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9]/g, '_');
+    const filePath = `${id}/${Date.now()}_${cleanFileName}.${fileExt}`;
+    const groupName = group?.name || "Grup";
     
-    const { error: uploadError } = await supabase.storage.from('study_drive').upload(filePath, file);
-    
-    if (uploadError) {
-      alert("Gagal mengupload file: " + uploadError.message);
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-    
-    const { data } = supabase.storage.from('study_drive').getPublicUrl(filePath);
-    
-    await supabase.from("group_messages").insert({
+    // 1. Optimistic Update
+    const optimisticMsg = {
+      id: tempId,
       group_id: id,
       user_id: user.id,
-      content: msgInput.trim() || `Membagikan file: ${file.name}`,
+      content: msgInput.trim() || `Berbagi file di ${groupName}: ${file.name}`,
       type: "file",
-      file_url: data.publicUrl,
       file_name: file.name,
-      file_size: file.size
-    });
-    
-    setMsgInput(""); 
-    setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+      file_size: file.size,
+      loading: true,
+      created_at: new Date().toISOString(),
+      profiles: {
+        name: profile?.name || "Anda",
+        avatar_url: profile?.avatar_url || null
+      }
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setMsgInput("");
+
+    try {
+      // 2. Upload to Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage.from('study_drive').upload(filePath, file);
+      if (uploadError) {
+         console.error("Storage Error:", uploadError);
+         throw new Error("Gagal mengunggah ke Study Drive: " + uploadError.message);
+      }
+      
+      const { data: urlRes } = supabase.storage.from('study_drive').getPublicUrl(filePath);
+      const publicUrl = urlRes?.publicUrl;
+      
+      if (!publicUrl) throw new Error("Gagal mendapatkan URL file publik.");
+      
+      // 3. Insert Message Metadata
+      const { data: msgData, error: msgError } = await supabase.from("group_messages").insert({
+        group_id: id,
+        user_id: user.id,
+        content: optimisticMsg.content,
+        type: "file",
+        file_url: publicUrl,
+        file_name: file.name,
+        file_size: file.size
+      }).select().single();
+
+      if (msgError) {
+        console.error("Database Insert Error:", msgError);
+        // If upload succeeded but DB failed, we still have the file URL!
+        // We'll update the local message anyway so the user can see it, then tell them.
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...optimisticMsg, id: `failed-${tempId}`, file_url: publicUrl, loading: false } : m));
+        throw new Error("File terunggah, tapi gagal mencatat ke chat: " + msgError.message);
+      }
+
+      // 4. Final Update with Real ID from DB
+      if (msgData) {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...msgData, profiles: optimisticMsg.profiles } : m));
+      }
+    } catch (err: any) {
+      console.error("The whole process failed:", err);
+      // Only remove if it's a storage failure. If it's a DB failure, we might have kept it with 'failed-' ID above.
+      if (!err.message.includes("mencatat ke chat")) {
+        setMessages(prev => prev.filter(m => m.id !== tempId));
+      }
+      alert(err.message || "Gagal mengunggah file. Silakan periksa koneksi atau ukuran file.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   if (loading) {
@@ -384,13 +430,21 @@ export default function StudyGroupRoom() {
                       {m.type === "file" ? (
                         <div className="flex flex-col gap-2">
                           {m.content && m.content !== `Membagikan file: ${m.file_name}` && <div>{m.content}</div>}
-                          <a href={m.file_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 bg-black/10 p-3 rounded-xl hover:bg-black/20 transition-colors w-[220px] sm:w-[260px]">
-                            <div className="bg-white/20 p-2 rounded-lg text-current"><FileText className="w-5 h-5"/></div>
+                          <a 
+                            href={m.loading ? undefined : m.file_url} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className={`flex items-center gap-3 bg-black/10 p-3 rounded-xl transition-colors w-[220px] sm:w-[260px] ${m.loading ? "opacity-70 cursor-wait" : "hover:bg-black/20"}`}
+                            onClick={m.loading ? (e) => e.preventDefault() : undefined}
+                          >
+                            <div className="bg-white/20 p-2 rounded-lg text-current">
+                              {m.loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5"/>}
+                            </div>
                             <div className="flex-1 min-w-0">
                               <div className="font-bold truncate" title={m.file_name}>{m.file_name}</div>
                               <div className="text-xs opacity-80">{(m.file_size / 1024).toFixed(1)} KB</div>
                             </div>
-                            <Download className="w-4 h-4 opacity-80" />
+                            {!m.loading && <Download className="w-4 h-4 opacity-80" />}
                           </a>
                         </div>
                       ) : (
